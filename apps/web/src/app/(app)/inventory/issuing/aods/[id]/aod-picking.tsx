@@ -16,16 +16,16 @@ import {
   TextInput,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import {
-  startTransition,
-  useActionState,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from 'react';
+import { startTransition, useActionState, useMemo, useState } from 'react';
 import type { AodDto } from '@dax/inventory-contract';
-import { Icon, Mono, Pill, Scanner, SectionCard } from '@dax/web-shell';
+import {
+  Icon,
+  Mono,
+  Pill,
+  type ScanReply,
+  Scanner,
+  SectionCard,
+} from '@dax/web-shell';
 import { StateAlert } from '../../../../../../components/state-alert';
 import {
   type ActionState,
@@ -84,34 +84,27 @@ function ScanConfirm({
   onPart: () => void;
   onClose: () => void;
 }) {
-  const [pending, startLookup] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
-  const busy = useRef(false);
 
-  function handle(code: string) {
-    if (busy.current) return;
-    busy.current = true;
-    startLookup(async () => {
-      try {
-        const match = await identifyCode(code);
-        if (match.type === 'bin') {
-          setMessage(null);
-          onBin(match.bin);
-        } else if (match.type === 'part') {
-          if (match.itemIds.includes(line.item.id)) {
-            setMessage(null);
-            onPart();
-          } else
-            setMessage(
-              `That is a different part. This line needs ${line.item.partNo}.`,
-            );
-        } else if (match.type === 'none')
-          setMessage('Nothing matches that code.');
-        else setMessage(match.message);
-      } finally {
-        busy.current = false;
+  async function handle(code: string): Promise<ScanReply> {
+    const match = await identifyCode(code);
+    if (match.type === 'bin') {
+      setMessage(null);
+      onBin(match.bin);
+      return 'ok';
+    }
+    if (match.type === 'part') {
+      if (match.itemIds.includes(line.item.id)) {
+        setMessage(null);
+        onPart();
+        return 'ok';
       }
-    });
+      setMessage(
+        `That is a different part. This line needs ${line.item.partNo}.`,
+      );
+    } else if (match.type === 'none') setMessage('Nothing matches that code.');
+    else setMessage(match.message);
+    return 'miss';
   }
 
   return (
@@ -129,7 +122,7 @@ function ScanConfirm({
           {line.partOk ? 'Part confirmed' : 'Part not scanned'}
         </Pill>
       </Group>
-      <Scanner onCode={handle} busy={pending} />
+      <Scanner onCode={handle} />
       {message ? <Alert color="orange">{message}</Alert> : null}
       <Button size="lg" onClick={onClose}>
         Done

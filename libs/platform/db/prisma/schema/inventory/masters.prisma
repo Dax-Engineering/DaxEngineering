@@ -35,11 +35,26 @@ model Brand {
   @@schema("inventory")
 }
 
+/// What kind of machine a model is: Excavator, Generator, Truck...
+model MachineType {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  name          String         @unique
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  machineModels MachineModel[]
+
+  @@map("machine_type")
+  @@schema("inventory")
+}
+
 model MachineModel {
-  id        String             @id @default(uuid(7)) @db.Uuid
-  name      String             @unique
-  brandId   String?            @map("brand_id") @db.Uuid
-  brand     Brand?             @relation(fields: [brandId], references: [id])
+  id            String             @id @default(uuid(7)) @db.Uuid
+  name          String             @unique
+  brandId       String?            @map("brand_id") @db.Uuid
+  brand         Brand?             @relation(fields: [brandId], references: [id])
+  machineTypeId String?            @map("machine_type_id") @db.Uuid
+  machineType   MachineType?       @relation(fields: [machineTypeId], references: [id], onDelete: SetNull)
   active    Boolean            @default(true)
   createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -68,6 +83,12 @@ model Item {
   status         ItemStatus         @default(ACTIVE)
   qrToken        String             @unique @map("qr_token")
   notes          String?
+  /// Main supplier (parties module): plain uuid + name snapshot, no relation.
+  supplierId     String?            @map("supplier_id") @db.Uuid
+  supplierName   String?            @map("supplier_name")
+  tags           String[]           @default([])
+  preCostPrice   Decimal?           @map("pre_cost_price") @db.Decimal(14, 2)
+  sellingPrice   Decimal?           @map("selling_price") @db.Decimal(14, 2)
   version        Int                @default(1)
   createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   createdBy      String             @map("created_by") @db.Uuid
@@ -87,9 +108,11 @@ model Item {
   returnLines    ReturnLine[]
   countLines     CountLine[]
   warrantyTags   WarrantyTag[]
+  phoneScans     PhoneScanLine[]
 
   @@unique([brandId, partNoNorm])
   @@index([partNoNorm])
+  @@index([supplierId])
   @@index([status])
   @@map("item")
   @@schema("inventory")

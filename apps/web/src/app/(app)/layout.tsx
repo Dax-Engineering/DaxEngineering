@@ -113,11 +113,15 @@ export default async function AppLayout({
         userName={me.user.name}
         userNote={me.user.isSuperAdmin ? 'Super admin' : 'Stores'}
         nav={nav}
+        scan={canScan ? { href: '/scan', label: 'Scan' } : undefined}
+        mobileKeys={['home', 'stock', 'issuing']}
         actions={
-          canScan ? (
-            <Link href="/scan" className="dax-cta">
-              <Icon name="scan" size={20} />
-              Scan
+          // On the PC the only scan option is lending a phone; phones scan
+          // with their own camera from the bottom bar.
+          canDo(caps, 'inventory.item.view') ? (
+            <Link href="/scan/phone" className="dax-cta">
+              <Icon name="phone" size={20} />
+              Scan with phone
             </Link>
           ) : null
         }

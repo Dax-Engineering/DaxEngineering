@@ -21,7 +21,7 @@ function numberField(form: FormData, key: string): number | undefined {
 
 export async function POST(request: Request): Promise<Response> {
   const config = readServerConfig(APP);
-  if (!isSameOrigin(request, config.publicOrigin)) {
+  if (!isSameOrigin(request, config.trustedOrigins)) {
     return plainText(403, 'This request was blocked.');
   }
   if (Number(request.headers.get('content-length') ?? 0) > MAX_FORM_BYTES) {

@@ -13,15 +13,17 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import Link from 'next/link';
-import {
-  startTransition,
-  useActionState,
-  useRef,
-  useState,
-  useTransition,
-} from 'react';
+import { startTransition, useActionState, useRef, useState } from 'react';
 import type { PutawayRow } from '@dax/inventory-contract';
-import { Empty, Icon, Mono, Pill, Scanner, SectionCard } from '@dax/web-shell';
+import {
+  Empty,
+  Icon,
+  Mono,
+  Pill,
+  type ScanReply,
+  Scanner,
+  SectionCard,
+} from '@dax/web-shell';
 import { StateAlert } from '../../../../../components/state-alert';
 import { type ActionState, IDLE } from '../../../../../lib/action-state';
 import { formatDateTime, formatQty } from '../../../../../lib/format';
@@ -58,9 +60,7 @@ function usePutAway(onDone: () => void) {
 function BinChooser({ onChoose }: { onChoose: (bin: BinRef) => void }) {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startLookup] = useTransition();
   const labels = useRef(new Map<string, string>());
-  const busy = useRef(false);
 
   async function search(q: string): Promise<PickerOption[]> {
     const found = await searchBins(q);
@@ -68,29 +68,23 @@ function BinChooser({ onChoose }: { onChoose: (bin: BinRef) => void }) {
     return found;
   }
 
-  function handle(code: string) {
-    if (busy.current) return;
-    busy.current = true;
-    startLookup(async () => {
-      try {
-        const result = await lookupBin(code);
-        if (result.type === 'bin') {
-          setError(null);
-          setScanning(false);
-          onChoose(result.bin);
-        } else if (result.type === 'none') {
-          setError('No bin matches that label.');
-        } else setError(result.message);
-      } finally {
-        busy.current = false;
-      }
-    });
+  async function handle(code: string): Promise<ScanReply> {
+    const result = await lookupBin(code);
+    if (result.type === 'bin') {
+      setError(null);
+      setScanning(false);
+      onChoose(result.bin);
+      return 'ok';
+    }
+    if (result.type === 'none') setError('No bin matches that label.');
+    else setError(result.message);
+    return 'miss';
   }
 
   return (
     <Stack gap="sm">
       {scanning ? (
-        <Scanner onCode={handle} busy={pending} />
+        <Scanner onCode={handle} />
       ) : (
         <Button
           size="lg"

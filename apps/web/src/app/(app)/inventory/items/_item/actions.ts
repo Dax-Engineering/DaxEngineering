@@ -36,7 +36,15 @@ function readForm(form: FormData) {
     defaultBinId: nullable(text(form, 'defaultBinId')),
     machineModelIds: list(form, 'machineModelIds'),
     notes: nullable(text(form, 'notes')),
+    supplierId: nullable(text(form, 'supplierId')),
+    tags: list(form, 'tags').map((t) => t.toLowerCase()),
+    preCostPrice: nullable(text(form, 'preCostPrice').replace(/,/g, '')),
+    sellingPrice: nullable(text(form, 'sellingPrice').replace(/,/g, '')),
   };
+}
+
+function samePrice(a: string | null, b: string | null): boolean {
+  return a === null || b === null ? a === b : Number(a) === Number(b);
 }
 
 function sameIds(a: string[], b: string[]): boolean {
@@ -62,6 +70,13 @@ function itemChanges(current: ItemDetail, next: ReturnType<typeof readForm>) {
   )
     changes.machineModelIds = next.machineModelIds;
   if (next.notes !== (current.notes ?? null)) changes.notes = next.notes;
+  if (next.supplierId !== (current.supplier?.id ?? null))
+    changes.supplierId = next.supplierId;
+  if (next.tags.join('|') !== current.tags.join('|')) changes.tags = next.tags;
+  if (!samePrice(next.preCostPrice, current.preCostPrice))
+    changes.preCostPrice = next.preCostPrice;
+  if (!samePrice(next.sellingPrice, current.sellingPrice))
+    changes.sellingPrice = next.sellingPrice;
   return changes;
 }
 

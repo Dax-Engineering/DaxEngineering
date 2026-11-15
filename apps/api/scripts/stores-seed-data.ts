@@ -28,16 +28,269 @@ export const BRANDS = [
   'Gates',
 ];
 
-export const MACHINE_MODELS: { name: string; brand: string }[] = [
-  { name: 'CAT 320D excavator', brand: 'Caterpillar' },
-  { name: 'CAT C9 engine', brand: 'Caterpillar' },
-  { name: 'CAT 3306 generator', brand: 'Caterpillar' },
-  { name: 'Komatsu PC200-8 excavator', brand: 'Komatsu' },
-  { name: 'Perkins 1104C generator', brand: 'Perkins' },
-  { name: 'Cummins 6BT5.9 engine', brand: 'Cummins' },
-  { name: 'Cummins QSK19 generator', brand: 'Cummins' },
-  { name: 'Volvo Penta TAD1641GE generator', brand: 'Volvo Penta' },
+export const MACHINE_TYPES = ['Excavator', 'Engine', 'Generator'];
+
+export const MACHINE_MODELS: { name: string; brand: string; type: string }[] = [
+  { name: 'CAT 320D excavator', brand: 'Caterpillar', type: 'Excavator' },
+  { name: 'CAT C9 engine', brand: 'Caterpillar', type: 'Engine' },
+  { name: 'CAT 3306 generator', brand: 'Caterpillar', type: 'Generator' },
+  { name: 'Komatsu PC200-8 excavator', brand: 'Komatsu', type: 'Excavator' },
+  { name: 'Perkins 1104C generator', brand: 'Perkins', type: 'Generator' },
+  { name: 'Cummins 6BT5.9 engine', brand: 'Cummins', type: 'Engine' },
+  { name: 'Cummins QSK19 generator', brand: 'Cummins', type: 'Generator' },
+  {
+    name: 'Volvo Penta TAD1641GE generator',
+    brand: 'Volvo Penta',
+    type: 'Generator',
+  },
 ];
+
+/** Main supplier, tags and prices (rupees) per part number. */
+export const ITEM_EXTRAS: Record<
+  string,
+  { supplier: string; tags: string[]; preCost: string; selling: string }
+> = {
+  '1R-0750': {
+    supplier: 'Colombo Engine Spares',
+    tags: ['filters', 'fast moving'],
+    preCost: '4850',
+    selling: '6900',
+  },
+  '1R-1808': {
+    supplier: 'Colombo Engine Spares',
+    tags: ['filters', 'fast moving'],
+    preCost: '5200',
+    selling: '7350',
+  },
+  '10R-7225': {
+    supplier: 'Gulf Heavy Parts FZE',
+    tags: ['fuel system', 'reman'],
+    preCost: '68500',
+    selling: '92000',
+  },
+  '110-6326': {
+    supplier: 'Gulf Heavy Parts FZE',
+    tags: ['cooling'],
+    preCost: '96000',
+    selling: '128500',
+  },
+  '4N-0565': {
+    supplier: 'Colombo Engine Spares',
+    tags: ['fuel system'],
+    preCost: '14200',
+    selling: '19800',
+  },
+  '247-1565': {
+    supplier: 'Gulf Heavy Parts FZE',
+    tags: ['gaskets'],
+    preCost: '23500',
+    selling: '32900',
+  },
+  '6754-11-3100': {
+    supplier: 'Singapore Power Spares Pte Ltd',
+    tags: ['fuel system'],
+    preCost: '58000',
+    selling: '79500',
+  },
+  '6754-61-1110': {
+    supplier: 'Singapore Power Spares Pte Ltd',
+    tags: ['cooling'],
+    preCost: '61500',
+    selling: '84000',
+  },
+  '6754-11-1811': {
+    supplier: 'Singapore Power Spares Pte Ltd',
+    tags: ['gaskets'],
+    preCost: '17800',
+    selling: '24900',
+  },
+  U5MK8261: {
+    supplier: 'Chennai Diesel Components',
+    tags: ['cooling', 'kits'],
+    preCost: '38900',
+    selling: '52500',
+  },
+  '2645A747': {
+    supplier: 'Colombo Engine Spares',
+    tags: ['belts', 'fast moving'],
+    preCost: '3650',
+    selling: '5200',
+  },
+  U5LT0365: {
+    supplier: 'Chennai Diesel Components',
+    tags: ['gaskets', 'kits'],
+    preCost: '27400',
+    selling: '37800',
+  },
+  '2848A071': {
+    supplier: 'Chennai Diesel Components',
+    tags: ['cooling'],
+    preCost: '6200',
+    selling: '8900',
+  },
+  '3802820': {
+    supplier: 'Shenzhen GenParts Co. Ltd',
+    tags: ['gaskets', 'kits'],
+    preCost: '21800',
+    selling: '29900',
+  },
+  '3286278': {
+    supplier: 'Shenzhen GenParts Co. Ltd',
+    tags: ['cooling'],
+    preCost: '44500',
+    selling: '61000',
+  },
+  '4914505': {
+    supplier: 'Shenzhen GenParts Co. Ltd',
+    tags: ['cooling'],
+    preCost: '5400',
+    selling: '7800',
+  },
+  '4307016': {
+    supplier: 'Shenzhen GenParts Co. Ltd',
+    tags: ['fuel system'],
+    preCost: '52000',
+    selling: '71500',
+  },
+  '21141858': {
+    supplier: 'Gulf Heavy Parts FZE',
+    tags: ['fuel system', 'marine'],
+    preCost: '87500',
+    selling: '118000',
+  },
+  '20734269': {
+    supplier: 'Gulf Heavy Parts FZE',
+    tags: ['cooling', 'marine'],
+    preCost: '72000',
+    selling: '97500',
+  },
+  LF9009: {
+    supplier: 'Lanka Filter House',
+    tags: ['filters', 'fast moving'],
+    preCost: '6850',
+    selling: '9400',
+  },
+  FF5052: {
+    supplier: 'Lanka Filter House',
+    tags: ['filters', 'fast moving'],
+    preCost: '4300',
+    selling: '6100',
+  },
+  FS1000: {
+    supplier: 'Lanka Filter House',
+    tags: ['filters'],
+    preCost: '7900',
+    selling: '10900',
+  },
+  AF25139M: {
+    supplier: 'Lanka Filter House',
+    tags: ['filters'],
+    preCost: '11200',
+    selling: '15400',
+  },
+  WF2076: {
+    supplier: 'Lanka Filter House',
+    tags: ['filters', 'cooling'],
+    preCost: '3900',
+    selling: '5600',
+  },
+  HF6177: {
+    supplier: 'Lanka Filter House',
+    tags: ['filters', 'hydraulics'],
+    preCost: '9800',
+    selling: '13600',
+  },
+  '2654407': {
+    supplier: 'Lanka Filter House',
+    tags: ['filters', 'fast moving'],
+    preCost: '3200',
+    selling: '4650',
+  },
+  '26560201': {
+    supplier: 'Lanka Filter House',
+    tags: ['filters'],
+    preCost: '3800',
+    selling: '5450',
+  },
+  '600-211-1340': {
+    supplier: 'Lanka Filter House',
+    tags: ['filters'],
+    preCost: '4600',
+    selling: '6500',
+  },
+  '21707134': {
+    supplier: 'Lanka Filter House',
+    tags: ['filters', 'marine'],
+    preCost: '5100',
+    selling: '7200',
+  },
+  '15W40-CK4': {
+    supplier: 'Colombo Engine Spares',
+    tags: ['lubricants', 'fast moving'],
+    preCost: '1450',
+    selling: '1950',
+  },
+  'ELC-50': {
+    supplier: 'Colombo Engine Spares',
+    tags: ['lubricants', 'cooling'],
+    preCost: '1180',
+    selling: '1650',
+  },
+  '6205-2RS': {
+    supplier: 'Kandy Bearing Centre',
+    tags: ['bearings', 'fast moving'],
+    preCost: '890',
+    selling: '1350',
+  },
+  '22216 E': {
+    supplier: 'Kandy Bearing Centre',
+    tags: ['bearings'],
+    preCost: '24500',
+    selling: '33800',
+  },
+  'CR 40X62X7': {
+    supplier: 'Kandy Bearing Centre',
+    tags: ['seals'],
+    preCost: '1150',
+    selling: '1750',
+  },
+  'LGEP 2/1': {
+    supplier: 'Kandy Bearing Centre',
+    tags: ['lubricants'],
+    preCost: '4200',
+    selling: '5900',
+  },
+  '8PK1795': {
+    supplier: 'Island Hydraulics',
+    tags: ['belts'],
+    preCost: '5600',
+    selling: '7900',
+  },
+  'G4MXT-1/2': {
+    supplier: 'Island Hydraulics',
+    tags: ['hydraulics', 'hoses'],
+    preCost: '3400',
+    selling: '4850',
+  },
+  '20U-62-71212': {
+    supplier: 'Island Hydraulics',
+    tags: ['hydraulics', 'seals', 'kits'],
+    preCost: '18900',
+    selling: '26500',
+  },
+  '707-99-46600': {
+    supplier: 'Island Hydraulics',
+    tags: ['hydraulics', 'kits'],
+    preCost: '42500',
+    selling: '58900',
+  },
+  '4I-7404': {
+    supplier: 'Gulf Heavy Parts FZE',
+    tags: ['ground engaging'],
+    preCost: '15800',
+    selling: '21900',
+  },
+};
 
 /** Each zone gets racks 1-2, shelves 1-2 and positions A-C: 12 bins per zone. */
 export const ZONES = [

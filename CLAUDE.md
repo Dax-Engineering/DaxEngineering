@@ -8,7 +8,8 @@ Phase 1 is Stores / Inventory only; other modules plug in later. Read `docs/arch
 - Always run tasks through Nx: `pnpm nx <target> <project>`, `pnpm nx run-many -t lint typecheck test build`.
 - Run `pnpm nx sync` after adding a workspace dependency (non-interactive shells don't auto-sync).
 - `pnpm check` runs everything CI runs, including the format check. Fix formatting with `pnpm nx format:write`.
-- Local DB: `pnpm db:up` (Postgres on 127.0.0.1:55432), then `pnpm db:deploy`.
+- Local DB: Postgres 18 installed on the PC (Windows service `postgresql-x64-18`, localhost:5432), not Docker. First time: `pnpm db:native:setup`, then `pnpm db:deploy`. `pnpm db:up` only checks it is reachable.
+- Local file storage (uploads): `pnpm files:up` runs MinIO natively on 127.0.0.1:39000 (no Docker); `files:down` / `files:status`.
 - Tests that need real Postgres are `*.db.spec.ts` and skip unless `TEST_DATABASE_URL` is set: `pnpm db:test:reset` once, then `pnpm test:db`. Never point them at the dev database.
 - Never guess Nx generator flags; check `--help` first.
 
@@ -25,7 +26,7 @@ Phase 1 is Stores / Inventory only; other modules plug in later. Read `docs/arch
 ## Data sensitivity
 
 - Every database column gets a tier: Internal / Confidential / Restricted. Hidden fields are never selected and never sent.
-- Phase 1 stores no money (cost, price, value). Money belongs to a later module with its own restricted schema.
+- Phase 1 stores no money (cost, value) except each item's pre-costing and selling price (plain Internal item fields, DAX's decision). Other money belongs to a later module with its own restricted schema.
 - Never log request bodies, cookies, tokens or Restricted values.
 - Secrets live in Dokploy environment settings, never in git. `.env` is for local dev only.
 

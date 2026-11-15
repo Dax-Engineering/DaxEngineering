@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { normalizePartNo, type ScanResult } from '@dax/inventory-contract';
 import { can, type Policy } from '@dax/platform-core';
 import { PrismaService } from '@dax/platform-db';
+import { extractGtin, gtinForms } from './phone-scan/barcode-info';
 import { MainStore } from './main-store.service';
 import { looksLikeBinCode, parseScanCode, type QrKind } from './scan-code';
 
@@ -33,6 +34,16 @@ export class ScanService {
       select: { itemId: true },
     });
     if (barcode) return this.allowed(policy, 'item', barcode.itemId);
+    // The same product number in another form (UPC vs EAN, or inside a GS1
+    // box label) still finds the item.
+    const gtin = extractGtin(value);
+    if (gtin) {
+      const same = await this.prisma.itemBarcode.findFirst({
+        where: { code: { in: gtinForms(gtin) } },
+        select: { itemId: true },
+      });
+      if (same) return this.allowed(policy, 'item', same.itemId);
+    }
 
     if (looksLikeBinCode(value)) {
       const bin = await this.prisma.bin.findFirst({

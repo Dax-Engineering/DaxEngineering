@@ -12,8 +12,11 @@ export function pageNumbers(page: number, pages: number): (number | null)[] {
   const keep = new Set([1, pages, page - 1, page, page + 1]);
   // Near either end, show enough numbers that a single gap never hides one page.
   if (page <= 3) [2, 3, 4].forEach((n) => keep.add(n));
-  if (page >= pages - 2) [pages - 1, pages - 2, pages - 3].forEach((n) => keep.add(n));
-  const sorted = [...keep].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+  if (page >= pages - 2)
+    [pages - 1, pages - 2, pages - 3].forEach((n) => keep.add(n));
+  const sorted = [...keep]
+    .filter((n) => n >= 1 && n <= pages)
+    .sort((a, b) => a - b);
   const out: (number | null)[] = [];
   sorted.forEach((n, i) => {
     const prev = sorted[i - 1];
@@ -72,7 +75,11 @@ export function Pager({
       {pages > 1 || page > 1 ? (
         <span className="dax-pager-pages">
           {page > 1 ? (
-            <Link href={href(Math.min(page - 1, pages))} className="dax-pager-step" aria-label="Previous page">
+            <Link
+              href={href(Math.min(page - 1, pages))}
+              className="dax-pager-step"
+              aria-label="Previous page"
+            >
               <Icon name="back" size={16} />
             </Link>
           ) : (
@@ -82,7 +89,11 @@ export function Pager({
           )}
           {pageNumbers(Math.min(page, pages), pages).map((n, i) =>
             n === null ? (
-              <span key={`gap-${i}`} className="dax-pager-gap" aria-hidden="true">
+              <span
+                key={`gap-${i}`}
+                className="dax-pager-gap"
+                aria-hidden="true"
+              >
                 …
               </span>
             ) : (
@@ -98,7 +109,11 @@ export function Pager({
             ),
           )}
           {page < pages ? (
-            <Link href={href(page + 1)} className="dax-pager-step next" aria-label="Next page">
+            <Link
+              href={href(page + 1)}
+              className="dax-pager-step next"
+              aria-label="Next page"
+            >
               <Icon name="back" size={16} />
             </Link>
           ) : (

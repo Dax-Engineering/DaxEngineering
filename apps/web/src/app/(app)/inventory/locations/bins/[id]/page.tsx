@@ -51,7 +51,7 @@ export default async function BinPage({
     <>
       <PageHead
         back={{ href: '/inventory/locations', label: 'Bins and zones' }}
-        eyebrow={`Bin · zone ${bin.zone.code}`}
+        eyebrow={`Bin · zone ${bin.zone.code} · ${bin.zone.name}`}
         title={<Mono>{bin.code}</Mono>}
         actions={
           canPrint ? <PrintLabelsButton kind="bin" ids={[bin.id]} /> : null
@@ -124,7 +124,14 @@ export default async function BinPage({
         <SectionCard title="Where it is">
           <Facts
             items={[
-              { label: 'Zone', value: <Mono>{bin.zone.code}</Mono> },
+              {
+                label: 'Zone',
+                value: (
+                  <>
+                    <Mono>{bin.zone.code}</Mono> · {bin.zone.name}
+                  </>
+                ),
+              },
               { label: 'Rack', value: <Mono>{bin.rack}</Mono> },
               { label: 'Shelf', value: <Mono>{bin.shelf}</Mono> },
               { label: 'Position', value: <Mono>{bin.position}</Mono> },

@@ -35,6 +35,9 @@ import { ReturnsController } from './returns/returns.controller';
 import { ReturnsService } from './returns/returns.service';
 import { WarrantyController } from './warranty/warranty.controller';
 import { WarrantyService } from './warranty/warranty.service';
+import { PhoneScanController } from './phone-scan/phone-scan.controller';
+import { OnlineLookup } from './phone-scan/online-lookup';
+import { PhoneScanService } from './phone-scan/phone-scan.service';
 import { ScanController } from './scan.controller';
 import { ScanService } from './scan.service';
 import { StockController } from './stock.controller';
@@ -49,6 +52,7 @@ import { SummaryController } from './summary.controller';
     StockController,
     LabelsController,
     ScanController,
+    PhoneScanController,
     SummaryController,
     GrnsController,
     ReceivingSummaryController,
@@ -69,6 +73,8 @@ import { SummaryController } from './summary.controller';
     ItemsService,
     LocationsService,
     ScanService,
+    PhoneScanService,
+    OnlineLookup,
     StockPostingService,
     GrnsService,
     PutawayService,

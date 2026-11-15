@@ -8,6 +8,7 @@ import {
   CatalogLists,
   InventorySummary,
   ItemDetail,
+  ItemFacets,
   ItemPage,
   ItemQuery,
   StockPage,
@@ -19,7 +20,41 @@ import { type Query, readQuery, toQuery } from '../../../../lib/query';
 import { api } from '../../../../lib/server';
 
 const ZoneList = z.object({ zones: z.array(ZoneDto) });
-const EMPTY_CATALOG: CatalogLists = { brands: [], machineModels: [] };
+const EMPTY_CATALOG: CatalogLists = {
+  brands: [],
+  machineModels: [],
+  machineTypes: [],
+};
+
+/** Suppliers and tags in use on items, for list filters. */
+export const getItemFacets = cache(() =>
+  unlessForbidden(
+    api.request('/inventory/items/facets', (d) => ItemFacets.parse(d)),
+    { suppliers: [], tags: [] },
+  ),
+);
+
+/** Filter dropdowns for supplier, machine type and tag. */
+export async function itemFilterSelects() {
+  const [facets, catalog] = await Promise.all([getItemFacets(), getCatalog()]);
+  return [
+    {
+      name: 'supplierId',
+      label: 'Supplier',
+      data: facets.suppliers.map((s) => ({ value: s.id, label: s.name })),
+    },
+    {
+      name: 'machineTypeId',
+      label: 'Machine type',
+      data: catalog.machineTypes.map((t) => ({ value: t.id, label: t.name })),
+    },
+    {
+      name: 'tag',
+      label: 'Tag',
+      data: facets.tags.map((t) => ({ value: t, label: t })),
+    },
+  ].filter((s) => s.data.length > 0);
+}
 
 export const getCatalog = cache(() =>
   unlessForbidden(

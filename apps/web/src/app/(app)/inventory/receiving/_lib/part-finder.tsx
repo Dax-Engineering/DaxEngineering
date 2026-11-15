@@ -11,8 +11,8 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useDebouncedCallback, useMediaQuery } from '@mantine/hooks';
-import { useRef, useState, useTransition } from 'react';
-import { Icon, LinkList, Mono, Scanner } from '@dax/web-shell';
+import { useState, useTransition } from 'react';
+import { Icon, LinkList, Mono, type ScanReply, Scanner } from '@dax/web-shell';
 import { formatQty } from '../../../../../lib/format';
 import { findParts, getPart, lookupPart } from './actions';
 import type { PartLookup, PartRef } from './types';
@@ -88,22 +88,15 @@ function ScanParts({ onPick }: { onPick: (part: PartRef) => void }) {
   const [last, setLast] = useState<{ code: string; result: PartLookup } | null>(
     null,
   );
-  const busy = useRef(false);
-
-  function handle(code: string) {
-    if (busy.current) return;
-    busy.current = true;
-    startTransition(async () => {
-      try {
-        const result = await lookupPart(code);
-        if (result.type === 'part') {
-          setLast(null);
-          onPick(result.part);
-        } else setLast({ code, result });
-      } finally {
-        busy.current = false;
-      }
-    });
+  async function handle(code: string): Promise<ScanReply> {
+    const result = await lookupPart(code);
+    if (result.type === 'part') {
+      setLast(null);
+      onPick(result.part);
+      return 'ok';
+    }
+    setLast({ code, result });
+    return result.type === 'choices' ? 'ok' : 'miss';
   }
 
   function choose(id: string) {

@@ -19,6 +19,7 @@ import {
   ITEM_CSV_COLUMNS,
   ITEM_CSV_MAX_BYTES,
   type ItemDetail,
+  type ItemFacets,
   ItemInput,
   type ItemPage,
   ItemQuery,
@@ -52,6 +53,12 @@ export class ItemsController {
   @Requires('inventory.item.view')
   list(@Query() query: unknown): Promise<ItemPage> {
     return this.items.list(parse(ItemQuery, query));
+  }
+
+  @Get('facets')
+  @Requires('inventory.item.view')
+  facets(): Promise<ItemFacets> {
+    return this.items.facets();
   }
 
   @Get('import/template')

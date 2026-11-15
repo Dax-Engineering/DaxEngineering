@@ -55,7 +55,8 @@ export interface PlatformOptions {
 }
 
 export const PUBLIC_ORIGINS = Symbol.for('dax.platform-core.public-origins');
-export type PublicOrigins = Record<'web' | 'admin', string>;
+/** Public addresses: each app, and the one printed in label QR codes. */
+export type PublicOrigins = Record<'web' | 'admin' | 'labels', string>;
 
 @Module({})
 export class PlatformModule {
@@ -83,7 +84,13 @@ export class PlatformModule {
       ],
       providers: [
         { provide: AUTH_OPTIONS, useValue: options.auth },
-        { provide: PUBLIC_ORIGINS, useValue: { ...options.auth.origins } },
+        {
+          provide: PUBLIC_ORIGINS,
+          useValue: {
+            ...options.auth.origins,
+            labels: options.auth.labelOrigin ?? options.auth.origins.web,
+          },
+        },
         {
           provide: PLATFORM_CATALOG,
           useValue: { modules: options.catalog.modules, entities },

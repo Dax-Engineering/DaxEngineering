@@ -11,15 +11,21 @@ import {
   TextInput,
 } from '@mantine/core';
 import { startTransition, useActionState, useState } from 'react';
-import type { BrandDto, MachineModelDto } from '@dax/inventory-contract';
+import type {
+  BrandDto,
+  MachineModelDto,
+  MachineTypeDto,
+} from '@dax/inventory-contract';
 import { Empty, Pill } from '@dax/web-shell';
 import { StateAlert } from '../../../../components/state-alert';
 import { fieldError, IDLE } from '../../../../lib/action-state';
 import {
   createBrand,
   createMachineModel,
+  createMachineType,
   updateBrand,
   updateMachineModel,
+  updateMachineType,
 } from './actions';
 
 export function AddBrandForm() {
@@ -184,9 +190,105 @@ export function BrandList({
   );
 }
 
+export function AddTypeForm() {
+  const [state, action, pending] = useActionState(createMachineType, IDLE);
+  return (
+    <form action={action}>
+      <Stack gap="xs">
+        <StateAlert state={state} />
+        <Group align="flex-end" gap="sm">
+          <TextInput
+            key={state.message}
+            name="name"
+            label="New machine type"
+            placeholder="For example Excavator"
+            required
+            maxLength={60}
+            error={fieldError(state, 'name')}
+            style={{ flex: '1 1 200px' }}
+            size="md"
+          />
+          <Button type="submit" loading={pending} size="md">
+            Add type
+          </Button>
+        </Group>
+      </Stack>
+    </form>
+  );
+}
+
+function TypeRow({
+  type,
+  canManage,
+}: {
+  type: MachineTypeDto;
+  canManage: boolean;
+}) {
+  const [state, dispatch, pending] = useActionState(updateMachineType, IDLE);
+  return (
+    <ListRow
+      name={type.name}
+      meta={`${type.modelCount} ${type.modelCount === 1 ? 'model' : 'models'}`}
+      active={type.active}
+      canManage={canManage}
+      pending={pending}
+      error={state.error}
+      onSave={(changes) =>
+        startTransition(() =>
+          dispatch({
+            id: type.id,
+            input: {
+              name: changes.name ?? type.name,
+              active: changes.active ?? type.active,
+            },
+          }),
+        )
+      }
+    />
+  );
+}
+
+export function TypeList({
+  types,
+  canManage,
+}: {
+  types: MachineTypeDto[];
+  canManage: boolean;
+}) {
+  if (types.length === 0) {
+    return <Empty title="No machine types yet" />;
+  }
+  return (
+    <Stack gap="xs">
+      {types.map((t) => (
+        <TypeRow
+          key={`${t.id}:${t.name}:${t.active}`}
+          type={t}
+          canManage={canManage}
+        />
+      ))}
+    </Stack>
+  );
+}
+
 type BrandOption = { value: string; label: string };
 
-export function AddModelForm({ brands }: { brands: BrandOption[] }) {
+function withCurrent(
+  options: BrandOption[],
+  current: { id: string; name: string } | null,
+): BrandOption[] {
+  return current && !options.some((o) => o.value === current.id)
+    ? [...options, { value: current.id, label: current.name }]
+    : options;
+}
+
+export function AddModelForm({
+  brands,
+  types,
+}: {
+  brands: BrandOption[];
+  types: BrandOption[];
+}) {
   const [state, action, pending] = useActionState(createMachineModel, IDLE);
   return (
     <form action={action}>
@@ -214,6 +316,16 @@ export function AddModelForm({ brands }: { brands: BrandOption[] }) {
             style={{ flex: '1 1 180px' }}
             size="md"
           />
+          <Select
+            name="machineTypeId"
+            label="Machine type"
+            placeholder="No type"
+            data={types}
+            searchable
+            clearable
+            style={{ flex: '1 1 180px' }}
+            size="md"
+          />
           <Button type="submit" loading={pending} size="md">
             Add model
           </Button>
@@ -226,22 +338,22 @@ export function AddModelForm({ brands }: { brands: BrandOption[] }) {
 function ModelRow({
   model,
   brands,
+  types,
   canManage,
 }: {
   model: MachineModelDto;
   brands: BrandOption[];
+  types: BrandOption[];
   canManage: boolean;
 }) {
   const [state, dispatch, pending] = useActionState(updateMachineModel, IDLE);
-  const brand = model.brand;
-  const options =
-    brand && !brands.some((b) => b.value === brand.id)
-      ? [...brands, { value: brand.id, label: brand.name }]
-      : brands;
+  const options = withCurrent(brands, model.brand);
+  const typeOptions = withCurrent(types, model.machineType);
   const save = (changes: {
     name?: string;
     active?: boolean;
     brandId?: string | null;
+    machineTypeId?: string | null;
   }) =>
     startTransition(() =>
       dispatch({
@@ -253,13 +365,19 @@ function ModelRow({
             changes.brandId === undefined
               ? (model.brand?.id ?? null)
               : changes.brandId,
+          machineTypeId:
+            changes.machineTypeId === undefined
+              ? (model.machineType?.id ?? null)
+              : changes.machineTypeId,
         },
       }),
     );
   return (
     <ListRow
       name={model.name}
-      meta={`${model.brand ? `${model.brand.name} · ` : ''}${count(model.itemCount)}`}
+      meta={[model.brand?.name, model.machineType?.name, count(model.itemCount)]
+        .filter(Boolean)
+        .join(' · ')}
       active={model.active}
       canManage={canManage}
       pending={pending}
@@ -267,17 +385,30 @@ function ModelRow({
       onSave={save}
       extra={
         canManage ? (
-          <Select
-            aria-label="Brand"
-            placeholder="Any brand"
-            data={options}
-            value={model.brand?.id ?? null}
-            onChange={(v) => save({ brandId: v })}
-            searchable
-            clearable
-            disabled={pending}
-            maw={260}
-          />
+          <Group gap="xs">
+            <Select
+              aria-label="Brand"
+              placeholder="Any brand"
+              data={options}
+              value={model.brand?.id ?? null}
+              onChange={(v) => save({ brandId: v })}
+              searchable
+              clearable
+              disabled={pending}
+              maw={220}
+            />
+            <Select
+              aria-label="Machine type"
+              placeholder="No type"
+              data={typeOptions}
+              value={model.machineType?.id ?? null}
+              onChange={(v) => save({ machineTypeId: v })}
+              searchable
+              clearable
+              disabled={pending}
+              maw={220}
+            />
+          </Group>
         ) : null
       }
     />
@@ -287,10 +418,12 @@ function ModelRow({
 export function ModelList({
   models,
   brands,
+  types,
   canManage,
 }: {
   models: MachineModelDto[];
   brands: BrandOption[];
+  types: BrandOption[];
   canManage: boolean;
 }) {
   if (models.length === 0) {
@@ -300,9 +433,10 @@ export function ModelList({
     <Stack gap="xs">
       {models.map((m) => (
         <ModelRow
-          key={`${m.id}:${m.name}:${m.active}:${m.brand?.id ?? ''}`}
+          key={`${m.id}:${m.name}:${m.active}:${m.brand?.id ?? ''}:${m.machineType?.id ?? ''}`}
           model={m}
           brands={brands}
+          types={types}
           canManage={canManage}
         />
       ))}

@@ -16,6 +16,9 @@ import {
   type MachineModelDto,
   MachineModelInput,
   MachineModelUpdate,
+  type MachineTypeDto,
+  MachineTypeInput,
+  MachineTypeUpdate,
 } from '@dax/inventory-contract';
 import {
   assertWritable,
@@ -33,7 +36,9 @@ import {
   notFound,
   parse,
 } from './common';
-import { brandEntity, machineModelEntity } from './entities';
+import { brandEntity, machineModelEntity, machineTypeEntity } from './entities';
+
+const TYPE_EXISTS = 'A machine type with that name already exists.';
 
 const BRAND_SELECT = {
   id: true,
@@ -47,8 +52,30 @@ const MODEL_SELECT = {
   name: true,
   active: true,
   brand: { select: { id: true, name: true } },
+  machineType: { select: { id: true, name: true } },
   _count: { select: { items: true } },
 } as const;
+
+const TYPE_SELECT = {
+  id: true,
+  name: true,
+  active: true,
+  _count: { select: { machineModels: true } },
+} as const;
+
+function toType(row: {
+  id: string;
+  name: string;
+  active: boolean;
+  _count: { machineModels: number };
+}): MachineTypeDto {
+  return {
+    id: row.id,
+    name: row.name,
+    active: row.active,
+    modelCount: row._count.machineModels,
+  };
+}
 
 function toBrand(row: {
   id: string;
@@ -69,12 +96,14 @@ function toModel(row: {
   name: string;
   active: boolean;
   brand: { id: string; name: string } | null;
+  machineType: { id: string; name: string } | null;
   _count: { items: number };
 }): MachineModelDto {
   return {
     id: row.id,
     name: row.name,
     brand: row.brand,
+    machineType: row.machineType,
     active: row.active,
     itemCount: row._count.items,
   };
@@ -90,7 +119,7 @@ export class CatalogController {
   @Get('catalog')
   @Requires('inventory.catalog.view')
   async lists(): Promise<CatalogLists> {
-    const [brands, models] = await Promise.all([
+    const [brands, models, types] = await Promise.all([
       this.prisma.brand.findMany({
         select: BRAND_SELECT,
         orderBy: { name: 'asc' },
@@ -99,8 +128,78 @@ export class CatalogController {
         select: MODEL_SELECT,
         orderBy: { name: 'asc' },
       }),
+      this.prisma.machineType.findMany({
+        select: TYPE_SELECT,
+        orderBy: { name: 'asc' },
+      }),
     ]);
-    return { brands: brands.map(toBrand), machineModels: models.map(toModel) };
+    return {
+      brands: brands.map(toBrand),
+      machineModels: models.map(toModel),
+      machineTypes: types.map(toType),
+    };
+  }
+
+  @Post('machine-types')
+  @Requires('inventory.catalog.manage')
+  async createType(
+    @Req() req: DaxRequest,
+    @Body() body: unknown,
+  ): Promise<MachineTypeDto> {
+    const input = parse(MachineTypeInput, body);
+    assertWritable(machineTypeEntity, sessionOf(req).policy, input);
+    await this.assertTypeNameFree(input.name);
+    const row = await this.guard('TYPE_EXISTS', TYPE_EXISTS, () =>
+      this.prisma.$transaction(async (tx) => {
+        const created = await tx.machineType.create({
+          data: input,
+          select: TYPE_SELECT,
+        });
+        await this.record(
+          tx,
+          machineTypeEntity.key,
+          created.id,
+          'create',
+          null,
+          input,
+        );
+        return created;
+      }),
+    );
+    return toType(row);
+  }
+
+  @Patch('machine-types/:id')
+  @Requires('inventory.catalog.manage')
+  async updateType(
+    @Req() req: DaxRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ): Promise<MachineTypeDto> {
+    const input = parse(MachineTypeUpdate, body);
+    assertWritable(machineTypeEntity, sessionOf(req).policy, input);
+    const before = await this.prisma.machineType.findUnique({ where: { id } });
+    if (!before) notFound('Machine type not found.');
+    if (input.name !== undefined) await this.assertTypeNameFree(input.name, id);
+    const row = await this.guard('TYPE_EXISTS', TYPE_EXISTS, () =>
+      this.prisma.$transaction(async (tx) => {
+        const updated = await tx.machineType.update({
+          where: { id },
+          data: input,
+          select: TYPE_SELECT,
+        });
+        await this.record(
+          tx,
+          machineTypeEntity.key,
+          id,
+          'update',
+          pick(before, input),
+          input,
+        );
+        return updated;
+      }),
+    );
+    return toType(row);
   }
 
   @Post('brands')
@@ -182,6 +281,7 @@ export class CatalogController {
     assertWritable(machineModelEntity, sessionOf(req).policy, input);
     await this.assertModelNameFree(input.name);
     await this.assertBrand(input.brandId);
+    await this.assertType(input.machineTypeId);
     const row = await this.guard(
       'MODEL_EXISTS',
       'A machine model with that name already exists.',
@@ -219,6 +319,8 @@ export class CatalogController {
     if (input.name !== undefined)
       await this.assertModelNameFree(input.name, id);
     if (input.brandId !== undefined) await this.assertBrand(input.brandId);
+    if (input.machineTypeId !== undefined)
+      await this.assertType(input.machineTypeId);
     const row = await this.guard(
       'MODEL_EXISTS',
       'A machine model with that name already exists.',
@@ -268,6 +370,26 @@ export class CatalogController {
         'MODEL_EXISTS',
         'A machine model with that name already exists.',
       );
+  }
+
+  private async assertTypeNameFree(name: string, exceptId?: string) {
+    const clash = await this.prisma.machineType.findFirst({
+      where: {
+        name: { equals: name, mode: 'insensitive' },
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (clash) conflict('TYPE_EXISTS', TYPE_EXISTS);
+  }
+
+  private async assertType(machineTypeId: string | null) {
+    if (!machineTypeId) return;
+    const type = await this.prisma.machineType.findUnique({
+      where: { id: machineTypeId },
+      select: { id: true },
+    });
+    if (!type) invalid('Unknown machine type.', ['machineTypeId']);
   }
 
   private async assertBrand(brandId: string | null) {

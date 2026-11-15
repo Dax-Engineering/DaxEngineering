@@ -7,6 +7,7 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  TagsInput,
   Textarea,
   TextInput,
 } from '@mantine/core';
@@ -15,7 +16,8 @@ import type { CatalogLists, ItemDetail } from '@dax/inventory-contract';
 import { StateAlert } from '../../../../../components/state-alert';
 import { fieldError, IDLE } from '../../../../../lib/action-state';
 import { trimQty, UOM_OPTIONS } from '../../../../../lib/format';
-import { BinPicker } from '../../_lib/pickers';
+import { BinPicker, RemotePicker } from '../../_lib/pickers';
+import { searchSuppliers } from '../../receiving/_lib/actions';
 import { saveItem } from './actions';
 
 export function ItemForm({
@@ -28,6 +30,9 @@ export function ItemForm({
   const [state, action, pending] = useActionState(saveItem, IDLE);
   const [binId, setBinId] = useState<string | null>(
     item?.defaultBin?.id ?? null,
+  );
+  const [supplierId, setSupplierId] = useState<string | null>(
+    item?.supplier?.id ?? null,
   );
   const err = (key: string) => fieldError(state, key);
   const chosenModels = new Set(item?.machineModels.map((m) => m.id) ?? []);
@@ -137,6 +142,51 @@ export function ItemForm({
           defaultValue={item?.machineModels.map((m) => m.id) ?? []}
           nothingFoundMessage="No matching model"
           error={err('machineModelIds')}
+          size="md"
+        />
+        <SimpleGrid cols={{ base: 1, sm: 3 }}>
+          <RemotePicker
+            name="supplierId"
+            label="Main supplier"
+            search={searchSuppliers}
+            initial={
+              item?.supplier
+                ? { value: item.supplier.id, label: item.supplier.name }
+                : null
+            }
+            value={supplierId}
+            onChange={setSupplierId}
+            error={err('supplierId')}
+            size="md"
+          />
+          <TextInput
+            name="preCostPrice"
+            label="Pre-costing price (Rs)"
+            inputMode="decimal"
+            placeholder="0.00"
+            defaultValue={item?.preCostPrice ?? ''}
+            error={err('preCostPrice')}
+            size="md"
+          />
+          <TextInput
+            name="sellingPrice"
+            label="Selling price (Rs)"
+            inputMode="decimal"
+            placeholder="0.00"
+            defaultValue={item?.sellingPrice ?? ''}
+            error={err('sellingPrice')}
+            size="md"
+          />
+        </SimpleGrid>
+        <TagsInput
+          name="tags"
+          label="Tags"
+          description="Short labels to group and filter parts, like filters or fast moving. Press Enter after each."
+          clearable
+          maxTags={20}
+          splitChars={[',', 'Enter']}
+          defaultValue={item?.tags ?? []}
+          error={err('tags')}
           size="md"
         />
         <Textarea

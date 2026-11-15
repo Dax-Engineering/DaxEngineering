@@ -21,7 +21,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderScanner(onCode: (code: string) => void) {
+function renderScanner(
+  onCode: (code: string) => void | Promise<'ok' | 'miss' | void>,
+) {
   return render(
     <MantineProvider>
       <Scanner onCode={onCode} />
@@ -43,8 +45,31 @@ describe('Scanner', () => {
     const input = screen.getByLabelText(/Type or scan a code/);
     fireEvent.change(input, { target: { value: '  A-01-02-B ' } });
     fireEvent.submit(input.closest('form') as HTMLFormElement);
-    expect(onCode).toHaveBeenCalledWith('A-01-02-B');
+    expect(onCode).toHaveBeenCalledWith('A-01-02-B', 'typed');
     expect((input as HTMLInputElement).value).toBe('');
+  });
+
+  it('handles scans one at a time, in order, without dropping any', async () => {
+    const seen: string[] = [];
+    let release: () => void = () => undefined;
+    const onCode = vi.fn(async (code: string) => {
+      seen.push(`start ${code}`);
+      if (code === 'A') await new Promise<void>((r) => (release = r));
+      seen.push(`end ${code}`);
+      return 'ok' as const;
+    });
+    renderScanner(onCode);
+    const input = screen.getByLabelText(/Type or scan a code/);
+    const form = input.closest('form') as HTMLFormElement;
+    fireEvent.change(input, { target: { value: 'A' } });
+    fireEvent.submit(form);
+    fireEvent.change(input, { target: { value: 'B' } });
+    fireEvent.submit(form);
+    expect(seen).toEqual(['start A']);
+    release();
+    await vi.waitFor(() =>
+      expect(seen).toEqual(['start A', 'end A', 'start B', 'end B']),
+    );
   });
 });
 

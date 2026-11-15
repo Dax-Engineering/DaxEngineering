@@ -3,6 +3,7 @@ import { type ImportResult, pageMeta, pageWindow } from '@dax/contracts';
 import {
   type BarcodeInput,
   type ItemDetail,
+  type ItemFacets,
   type ItemInput,
   type ItemPage,
   type ItemQuery,
@@ -40,10 +41,15 @@ import {
 import {
   belowMinFilter,
   belowMinIds,
+  cleanTags,
+  extrasFilter,
+  ITEM_EXTRAS_SELECT,
+  itemExtras,
   itemSearch,
   nextOfFor,
 } from './item-queries';
 import { MainStore } from './main-store.service';
+import { activeSupplier } from './receiving/shared';
 import {
   dec,
   isBelowMin,
@@ -73,6 +79,7 @@ function summarySelect(storeId: string) {
       where: { storeId },
       select: { onHand: true, held: true, quarantine: true, receiving: true },
     },
+    ...ITEM_EXTRAS_SELECT,
   } as const;
 }
 
@@ -86,10 +93,6 @@ function detailSelect(storeId: string) {
     createdAt: true,
     updatedAt: true,
     defaultBin: { select: { id: true, code: true } },
-    machineModels: {
-      select: { machineModel: { select: { id: true, name: true } } },
-      orderBy: { machineModel: { name: 'asc' } },
-    },
     barcodes: {
       select: { id: true, code: true, kind: true },
       orderBy: { createdAt: 'asc' },
@@ -130,6 +133,7 @@ export function toSummary(row: SummaryRow): ItemSummary {
     minQty: qtyString(row.minQty),
     stock: figures,
     belowMin: isBelowMin(onHand, row.minQty),
+    ...itemExtras(row),
   };
 }
 
@@ -141,6 +145,10 @@ const WRITABLE_KEYS = [
   'minQty',
   'defaultBinId',
   'notes',
+  'supplierId',
+  'tags',
+  'preCostPrice',
+  'sellingPrice',
 ] as const;
 
 type ItemFields = Partial<Pick<ItemInput, (typeof WRITABLE_KEYS)[number]>>;
@@ -185,6 +193,7 @@ export class ItemsService {
           : {},
         itemSearch(query.q),
         belowMinFilter(query.belowMin, ids),
+        extrasFilter(query),
       ],
     };
     const [rows, total] = await Promise.all([
@@ -197,6 +206,26 @@ export class ItemsService {
       this.prisma.item.count({ where }),
     ]);
     return { items: rows.map(toSummary), ...pageMeta(query, total) };
+  }
+
+  async facets(): Promise<ItemFacets> {
+    const [suppliers, tags] = await Promise.all([
+      this.prisma.item.groupBy({
+        by: ['supplierId', 'supplierName'],
+        where: { supplierId: { not: null } },
+        orderBy: { supplierName: 'asc' },
+      }),
+      this.prisma.$queryRaw<{ tag: string }[]>`
+        SELECT DISTINCT unnest(tags) AS tag FROM inventory.item ORDER BY tag`,
+    ]);
+    return {
+      suppliers: suppliers.flatMap((s) =>
+        s.supplierId && s.supplierName
+          ? [{ id: s.supplierId, name: s.supplierName }]
+          : [],
+      ),
+      tags: tags.map((t) => t.tag),
+    };
   }
 
   async detail(policy: Policy, id: string): Promise<ItemDetail> {
@@ -225,7 +254,10 @@ export class ItemsService {
       ...toSummary(row),
       allowFraction: row.allowFraction,
       defaultBin: row.defaultBin,
-      machineModels: row.machineModels.map((m) => m.machineModel),
+      machineModels: row.machineModels.map(({ machineModel: m }) => ({
+        id: m.id,
+        name: m.name,
+      })),
       barcodes: row.barcodes,
       supersedes: row.supersedes.map(toRef),
       latestReplacement: latest ? toRef(latest) : null,
@@ -242,7 +274,11 @@ export class ItemsService {
   }
 
   async create(policy: Policy, input: ItemInput): Promise<ItemDetail> {
+    input = { ...input, tags: cleanTags(input.tags) };
     assertWritable(itemEntity, policy, writable(input));
+    const supplier = input.supplierId
+      ? await activeSupplier(this.prisma, input.supplierId)
+      : null;
     const partNoNorm = this.partNoNorm(input.partNo);
     const allowFraction = this.checkQty(input.uom, input.minQty);
     await this.checkRefs({
@@ -269,6 +305,11 @@ export class ItemsService {
             minQty: input.minQty,
             defaultBinId: input.defaultBinId,
             notes: input.notes ?? null,
+            supplierId: supplier?.id ?? null,
+            supplierName: supplier?.name ?? null,
+            tags: input.tags,
+            preCostPrice: input.preCostPrice,
+            sellingPrice: input.sellingPrice,
             qrToken: newQrToken(),
             createdBy: policy.userId,
             updatedBy: policy.userId,
@@ -305,6 +346,7 @@ export class ItemsService {
     const machineModelIds = present.has('machineModelIds')
       ? input.machineModelIds
       : undefined;
+    if (changes.tags) changes.tags = cleanTags(changes.tags);
     assertWritable(itemEntity, policy, changes);
 
     const before = await this.prisma.item.findUnique({
@@ -333,6 +375,15 @@ export class ItemsService {
           : null,
       machineModelIds: machineModelIds ?? [],
     });
+    let supplierName: string | null | undefined;
+    if (changes.supplierId !== undefined) {
+      supplierName =
+        changes.supplierId === null
+          ? null
+          : changes.supplierId === before.supplierId
+            ? before.supplierName
+            : (await activeSupplier(this.prisma, changes.supplierId)).name;
+    }
     if (brandId !== before.brandId || partNoNorm !== before.partNoNorm) {
       const clash = await this.prisma.item.findUnique({
         where: { brandId_partNoNorm: { brandId, partNoNorm } },
@@ -347,6 +398,7 @@ export class ItemsService {
           where: { id, version: input.version },
           data: {
             ...changes,
+            ...(supplierName !== undefined ? { supplierName } : {}),
             partNoNorm,
             allowFraction,
             version: { increment: 1 },
@@ -549,32 +601,37 @@ export class ItemsService {
     const binCodes = [
       ...new Set(rows.map((r) => r.defaultBinCode).filter(Boolean)),
     ];
-    const [brands, models, bins, existing, barcodes] = await Promise.all([
-      this.prisma.brand.findMany({
-        select: { id: true, name: true, active: true },
-      }),
-      this.prisma.machineModel.findMany({ select: { id: true, name: true } }),
-      this.prisma.bin.findMany({
-        where: {
-          storeId,
-          code: { in: binCodes },
-          active: true,
-          kind: 'STORAGE',
-        },
-        select: { id: true, code: true },
-      }),
-      this.prisma.item.findMany({
-        where: { partNoNorm: { in: norms } },
-        select: { brandId: true, partNoNorm: true },
-      }),
-      this.prisma.itemBarcode.findMany({
-        where: { code: { in: codes } },
-        select: { code: true },
-      }),
-    ]);
+    const [brands, models, bins, existing, barcodes, suppliers] =
+      await Promise.all([
+        this.prisma.brand.findMany({
+          select: { id: true, name: true, active: true },
+        }),
+        this.prisma.machineModel.findMany({ select: { id: true, name: true } }),
+        this.prisma.bin.findMany({
+          where: {
+            storeId,
+            code: { in: binCodes },
+            active: true,
+            kind: 'STORAGE',
+          },
+          select: { id: true, code: true },
+        }),
+        this.prisma.item.findMany({
+          where: { partNoNorm: { in: norms } },
+          select: { brandId: true, partNoNorm: true },
+        }),
+        this.prisma.itemBarcode.findMany({
+          where: { code: { in: codes } },
+          select: { code: true },
+        }),
+        this.prisma.supplier.findMany({
+          select: { id: true, name: true, active: true },
+        }),
+      ]);
     const { items, errors } = validateImport(rows, {
       brands: new Map(brands.map((b) => [nameKey(b.name), b])),
       machineModels: new Map(models.map((m) => [nameKey(m.name), m])),
+      suppliers: new Map(suppliers.map((p) => [nameKey(p.name), p])),
       storageBins: new Map(bins.map((b) => [b.code, b])),
       existingItems: new Set(
         existing.map((e) => itemKey(e.brandId, e.partNoNorm)),
@@ -591,6 +648,10 @@ export class ItemsService {
       minQty: true,
       ...(items.some((i) => i.defaultBinId) ? { defaultBinId: true } : {}),
       ...(items.some((i) => i.notes) ? { notes: true } : {}),
+      ...(items.some((i) => i.supplier) ? { supplierId: true } : {}),
+      ...(items.some((i) => i.tags.length) ? { tags: true } : {}),
+      ...(items.some((i) => i.preCostPrice) ? { preCostPrice: true } : {}),
+      ...(items.some((i) => i.sellingPrice) ? { sellingPrice: true } : {}),
     });
     await this.uniqueGuard(() => this.writeImport(policy, items), true);
     return { ...result, created: items.length };
@@ -612,6 +673,11 @@ export class ItemsService {
               minQty: item.minQty,
               defaultBinId: item.defaultBinId,
               notes: item.notes,
+              supplierId: item.supplier?.id ?? null,
+              supplierName: item.supplier?.name ?? null,
+              tags: item.tags,
+              preCostPrice: item.preCostPrice,
+              sellingPrice: item.sellingPrice,
               qrToken: newQrToken(),
               createdBy: policy.userId,
               updatedBy: policy.userId,

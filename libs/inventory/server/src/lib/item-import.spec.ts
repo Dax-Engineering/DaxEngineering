@@ -7,6 +7,7 @@ const HEADER = ITEM_CSV_COLUMNS.join(',');
 const CAT = '0190a000-0000-7000-8000-0000000000c1';
 const MODEL = '0190a000-0000-7000-8000-0000000000d1';
 const BIN = '0190a000-0000-7000-8000-0000000000b1';
+const SUP = '0190a000-0000-7000-8000-0000000000e1';
 
 const lookups: ImportLookups = {
   brands: new Map([
@@ -14,6 +15,13 @@ const lookups: ImportLookups = {
     ['old brand', { id: 'x', active: false }],
   ]),
   machineModels: new Map([['320d', { id: MODEL }]]),
+  suppliers: new Map([
+    [
+      'lanka filter house',
+      { id: SUP, name: 'Lanka Filter House', active: true },
+    ],
+    ['closed traders', { id: 'y', name: 'Closed Traders', active: false }],
+  ]),
   storageBins: new Map([['A-01-01-A', { id: BIN }]]),
   existingItems: new Set([`${CAT}|EXISTING1`]),
   barcodesInUse: new Set(['5000000000001']),
@@ -50,6 +58,38 @@ describe('item CSV validation', () => {
       barcodes: ['5012345678900', '5012345678901'],
       notes: 'Keep dry',
     });
+  });
+
+  it('reads supplier, tags and prices, and checks them', () => {
+    const { items, errors } = validate(
+      csv(
+        'P-1,Caterpillar,Filter,PCS,0,,,,,lanka filter house,Filters | Fast Moving|filters,"1,250.5",1999',
+        'P-2,Caterpillar,Filter,PCS,0,,,,,Nobody Ltd,bad#tag,12.345,',
+        'P-3,Caterpillar,Filter,PCS,0,,,,,Closed Traders,,,',
+      ),
+    );
+    expect(items[0]).toMatchObject({
+      supplier: { id: SUP, name: 'Lanka Filter House' },
+      tags: ['filters', 'fast moving'],
+      preCostPrice: '1250.5',
+      sellingPrice: '1999',
+    });
+    expect(errors.map((e) => [e.row, e.field])).toEqual([
+      [3, 'supplier'],
+      [3, 'tags'],
+      [3, 'pre_cost_price'],
+      [4, 'supplier'],
+    ]);
+  });
+
+  it('still accepts a file made before the supplier, tag and price columns', () => {
+    const read = readItemCsv(
+      [
+        'part_no,brand,description,uom,min_qty,default_bin,machine_models,barcodes,notes',
+        'P-9,Caterpillar,A,PCS,0,,,,',
+      ].join('\n'),
+    );
+    expect(read.ok).toBe(true);
   });
 
   it('defaults an empty minimum to zero and allows fractions for metres', () => {
@@ -154,6 +194,7 @@ describe('ItemsService.import', () => {
       bin: { findMany: async () => [] },
       item: { findMany: async () => [] },
       itemBarcode: { findMany: async () => [] },
+      supplier: { findMany: async () => [] },
       $transaction: async (run: (t: typeof tx) => Promise<unknown>) => {
         writes.push('transaction');
         return run(tx);

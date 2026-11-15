@@ -48,3 +48,74 @@ export function nextOfFor(db: Db) {
     return row?.supersededById ?? null;
   };
 }
+
+/** Supplier, tags, prices and the machine models (with their types) an item fits. */
+export const ITEM_EXTRAS_SELECT = {
+  supplierId: true,
+  supplierName: true,
+  tags: true,
+  preCostPrice: true,
+  sellingPrice: true,
+  machineModels: {
+    select: {
+      machineModel: {
+        select: {
+          id: true,
+          name: true,
+          machineType: { select: { id: true, name: true } },
+        },
+      },
+    },
+    orderBy: { machineModel: { name: 'asc' } },
+  },
+} as const satisfies Prisma.ItemSelect;
+
+type ExtrasRow = Prisma.ItemGetPayload<{ select: typeof ITEM_EXTRAS_SELECT }>;
+
+const money = (v: Prisma.Decimal | null) => (v === null ? null : v.toFixed(2));
+
+export function itemExtras(row: ExtrasRow) {
+  const types = new Map<string, { id: string; name: string }>();
+  for (const { machineModel } of row.machineModels) {
+    if (machineModel.machineType) {
+      types.set(machineModel.machineType.id, machineModel.machineType);
+    }
+  }
+  return {
+    supplier:
+      row.supplierId && row.supplierName
+        ? { id: row.supplierId, name: row.supplierName }
+        : null,
+    tags: row.tags,
+    machineTypes: [...types.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    ),
+    preCostPrice: money(row.preCostPrice),
+    sellingPrice: money(row.sellingPrice),
+  };
+}
+
+export function extrasFilter(query: {
+  supplierId?: string;
+  machineTypeId?: string;
+  tag?: string;
+}): Prisma.ItemWhereInput {
+  return {
+    AND: [
+      query.supplierId ? { supplierId: query.supplierId } : {},
+      query.machineTypeId
+        ? {
+            machineModels: {
+              some: { machineModel: { machineTypeId: query.machineTypeId } },
+            },
+          }
+        : {},
+      query.tag ? { tags: { has: query.tag } } : {},
+    ],
+  };
+}
+
+/** Trimmed, lower-case, without repeats, in the order given. */
+export function cleanTags(tags: readonly string[]): string[] {
+  return [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))];
+}

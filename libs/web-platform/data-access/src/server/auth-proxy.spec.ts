@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 const { createAuthProxy, isAllowedAuthPath, isSameOrigin, sanitizeAuthBody } =
   await import('./auth-proxy');
-const { appCookies, clientIp } = await import('./config');
+const { appCookies, clientIp, readServerConfig } = await import('./config');
 const { buildCsp } = await import('./csp');
 
 const ORIGIN = 'https://app.example.test';
@@ -50,6 +50,26 @@ describe('auth proxy rules', () => {
     expect(isSameOrigin(post('sign-out'), ORIGIN)).toBe(true);
     expect(
       isSameOrigin(post('sign-out', { origin: 'https://evil.test' }), ORIGIN),
+    ).toBe(false);
+  });
+
+  it('trusts the phone tunnel in development only', () => {
+    const tunnel = 'https://calm-fox.trycloudflare.com';
+    const env = {
+      API_INTERNAL_URL: 'http://127.0.0.1:3100',
+      INTERNAL_TOKEN_WEB: 'x'.repeat(32),
+      WEB_ORIGIN: ORIGIN,
+      WEB_PHONE_ORIGIN: tunnel,
+    };
+    const dev = readServerConfig('web', { ...env, NODE_ENV: 'development' });
+    expect(dev.trustedOrigins).toEqual([ORIGIN, tunnel]);
+    expect(
+      isSameOrigin(post('sign-out', { origin: tunnel }), dev.trustedOrigins),
+    ).toBe(true);
+    const prod = readServerConfig('web', { ...env, NODE_ENV: 'production' });
+    expect(prod.trustedOrigins).toEqual([ORIGIN]);
+    expect(
+      isSameOrigin(post('sign-out', { origin: tunnel }), prod.trustedOrigins),
     ).toBe(false);
   });
 });

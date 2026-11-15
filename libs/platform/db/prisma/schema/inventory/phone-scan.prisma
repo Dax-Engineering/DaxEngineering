@@ -1,0 +1,55 @@
+enum PhoneScanStatus {
+  WAITING
+  PAIRED
+  ENDED
+  LOCKED
+
+  @@schema("inventory")
+}
+
+/// A phone lent to a PC user as a scanner for a short time. The PC shows a
+/// link and a 6-digit code; the phone opens the link and types the code.
+/// Tokens and the code are stored as SHA-256 hashes only.
+model PhoneScanSession {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  status         PhoneScanStatus @default(WAITING)
+  linkTokenHash  String          @unique @map("link_token_hash")
+  codeHash       String          @map("code_hash")
+  failedAttempts Int             @default(0) @map("failed_attempts")
+  phoneTokenHash String?         @unique @map("phone_token_hash")
+  /// Pairing deadline while WAITING; end of scanning once PAIRED.
+  expiresAt      DateTime        @map("expires_at") @db.Timestamptz(3)
+  pairedAt       DateTime?       @map("paired_at") @db.Timestamptz(3)
+  endedAt        DateTime?       @map("ended_at") @db.Timestamptz(3)
+  lastScanAt     DateTime?       @map("last_scan_at") @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  lines          PhoneScanLine[]
+
+  @@index([userId, status])
+  @@map("phone_scan_session")
+  @@schema("inventory")
+}
+
+/// One line per item (or per code that matched no item) in a phone session.
+model PhoneScanLine {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  sessionId   String           @map("session_id") @db.Uuid
+  session     PhoneScanSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  /// `item:<id>` or `code:<code>`, so repeat scans add to the same line.
+  key         String
+  code        String
+  /// Barcode symbology the phone camera read, e.g. ean_13, code_128, qr_code.
+  format      String?
+  itemId      String?          @map("item_id") @db.Uuid
+  item        Item?            @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  /// Codes that matched several items keep how many, for the PC to sort out.
+  matches     Int              @default(0)
+  qty         Decimal          @default(1) @db.Decimal(14, 3)
+  firstSeenAt DateTime         @default(now()) @map("first_seen_at") @db.Timestamptz(3)
+  lastSeenAt  DateTime         @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+
+  @@unique([sessionId, key])
+  @@map("phone_scan_line")
+  @@schema("inventory")
+}

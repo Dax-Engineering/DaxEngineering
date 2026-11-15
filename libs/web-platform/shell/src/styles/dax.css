@@ -268,6 +268,9 @@ body {
 .dax-rail a:focus-visible .tip {
   opacity: 1;
 }
+.dax-bottom {
+  display: none;
+}
 .dax-main {
   min-width: 0;
   display: flex;
@@ -460,6 +463,14 @@ a.dax-kpi:hover {
 }
 
 /* Pills and chips */
+.dax-tag {
+  background: color-mix(in srgb, var(--dax-brand) 10%, transparent);
+  color: var(--dax-brand);
+  font-weight: 600;
+  font-size: 11.5px;
+  padding: 2px 8px;
+  margin-top: 4px;
+}
 .dax-pill {
   display: inline-flex;
   align-items: center;
@@ -1206,31 +1217,72 @@ a.dax-pager-step:hover {
     padding: 8px 16px 96px;
     gap: 14px;
   }
+  /* Phones use the bottom bar instead of the side rail */
   .dax-rail {
+    display: none;
+  }
+  .dax-bottom {
     position: fixed;
-    top: auto;
     left: 12px;
     right: 12px;
     bottom: max(12px, env(safe-area-inset-bottom));
     z-index: 40;
-    flex-direction: row;
-    justify-content: space-around;
-    gap: 4px;
-    padding: 8px;
-    border-radius: 999px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    align-items: end;
+    padding: 6px 6px 8px;
+    border-radius: 28px;
     background: var(--dax-panel);
     box-shadow: var(--dax-shadow);
-    overflow-x: auto;
   }
-  .dax-rail a {
-    width: 48px;
-    height: 48px;
-    flex: none;
-    box-shadow: none;
-    background: transparent;
+  .dax-bottom > a,
+  .dax-bottom > button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 6px 2px 2px;
+    border: 0;
+    border-radius: 18px;
+    background: none;
+    color: var(--dax-muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
   }
-  .dax-rail .tip {
-    display: none;
+  .dax-bottom > a span,
+  .dax-bottom > button span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dax-bottom > [aria-current='page'] {
+    color: var(--dax-brand);
+  }
+  /* The raised Scan button sits above the bar's top edge */
+  .dax-bottom > a.dax-bottom-scan {
+    margin-top: -30px;
+    color: var(--dax-ink);
+  }
+  .dax-bottom-scan svg {
+    box-sizing: content-box;
+    width: 28px;
+    height: 28px;
+    padding: 16px;
+    border-radius: 50%;
+    background: var(--dax-brand);
+    color: var(--dax-on-ink);
+    box-shadow:
+      0 0 0 5px var(--dax-panel),
+      0 8px 22px rgba(22, 37, 104, 0.35);
+  }
+  .dax-bottom-scan:active svg {
+    transform: scale(0.96);
   }
   .dax-h1 {
     font-size: 32px;
@@ -1593,4 +1645,1150 @@ div.dax-zone-row {
 }
 .dax-zone-chevron[data-open='true'] {
   transform: none;
+}
+
+/* Scanner: aiming frame. Rounded corner brackets; a square with a sweeping
+   glow for QR codes, a wide strip with a laser for barcodes. Green pop on a
+   hit, red shake on a miss. */
+.dax-scan-frame {
+  --c: rgba(255, 255, 255, 0.95);
+  --arm: 28px;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(76cqw, 110cqh);
+  height: min(56cqw, 64cqh);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.36);
+  /* A new shape (QR to barcode) fades in; resizing it would lag */
+  animation: dax-scan-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes dax-scan-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+.dax-scan-frame[data-target='qr'] {
+  --arm: 34px;
+  width: min(64cqw, 60cqh);
+  height: min(64cqw, 60cqh);
+  border-radius: 24px;
+}
+.dax-scan-frame[data-target='barcode'] {
+  width: min(86cqw, 560px);
+  height: min(36cqw, 44cqh, 220px);
+}
+
+/* Corner brackets: a border masked down to its four corners */
+.dax-scan-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 4px solid var(--c);
+  border-radius: inherit;
+  -webkit-mask: conic-gradient(
+      at var(--arm) var(--arm),
+      transparent 75%,
+      #000 0
+    )
+    0 0 / calc(100% - var(--arm)) calc(100% - var(--arm));
+  mask: conic-gradient(at var(--arm) var(--arm), transparent 75%, #000 0) 0 0 /
+    calc(100% - var(--arm)) calc(100% - var(--arm));
+  transition: border-color 0.15s;
+}
+/* A faint full outline so the shape reads at a glance */
+.dax-scan-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: inherit;
+}
+
+/* Moving light: a soft band for QR (and the general box) */
+.dax-scan-laser {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -40%;
+  height: 40%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(120, 190, 255, 0.26) 85%,
+    rgba(170, 215, 255, 0.8)
+  );
+  border-bottom: 2px solid rgba(190, 225, 255, 0.95);
+  animation: dax-scan-sweep 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  transition: opacity 0.15s;
+}
+@keyframes dax-scan-sweep {
+  to {
+    top: 100%;
+  }
+}
+/* ...and a red laser that travels up and down the barcode strip */
+.dax-scan-frame[data-target='barcode'] .dax-scan-laser {
+  left: 6%;
+  right: 6%;
+  top: 14%;
+  height: 2px;
+  margin-top: -1px;
+  border: 0;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #ff3b3b 15%,
+    #ff6b5e 50%,
+    #ff3b3b 85%,
+    transparent
+  );
+  box-shadow:
+    0 0 10px 2px rgba(255, 59, 59, 0.75),
+    0 0 28px 6px rgba(255, 59, 59, 0.3);
+  animation: dax-scan-laser 1.6s ease-in-out infinite alternate;
+}
+@keyframes dax-scan-laser {
+  to {
+    top: 86%;
+  }
+}
+.dax-scan-frame[data-flash] .dax-scan-laser {
+  opacity: 0;
+}
+
+/* Result: colour the corners, fill the frame, pop or shake */
+.dax-scan-hit {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.dax-scan-frame[data-flash='ok'] {
+  --c: #34d17f;
+  /* Keep the fade-in listed so it doesn't replay after the flash */
+  animation:
+    dax-scan-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    dax-scan-pop 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.dax-scan-frame[data-flash='ok'] .dax-scan-hit {
+  animation: dax-scan-hit-ok 0.45s ease-out;
+}
+.dax-scan-frame[data-flash='miss'] {
+  --c: #ff5a5a;
+  animation:
+    dax-scan-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    dax-scan-shake 0.36s ease-in-out;
+}
+.dax-scan-frame[data-flash='miss'] .dax-scan-hit {
+  animation: dax-scan-hit-miss 0.45s ease-out;
+}
+@keyframes dax-scan-pop {
+  40% {
+    transform: scale(1.05);
+  }
+}
+@keyframes dax-scan-shake {
+  20%,
+  60% {
+    transform: translateX(-7px);
+  }
+  40%,
+  80% {
+    transform: translateX(7px);
+  }
+}
+@keyframes dax-scan-hit-ok {
+  from {
+    background: rgba(52, 209, 127, 0.38);
+    box-shadow: inset 0 0 0 3px rgba(52, 209, 127, 0.9);
+  }
+  to {
+    background: rgba(52, 209, 127, 0);
+    box-shadow: inset 0 0 0 3px rgba(52, 209, 127, 0);
+  }
+}
+@keyframes dax-scan-hit-miss {
+  from {
+    background: rgba(255, 90, 90, 0.34);
+  }
+  to {
+    background: rgba(255, 90, 90, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dax-scan-frame,
+  .dax-scan-frame[data-flash],
+  .dax-scan-laser,
+  .dax-scan-frame[data-target='barcode'] .dax-scan-laser {
+    animation: none;
+    transition: none;
+  }
+  .dax-scan-laser {
+    opacity: 0;
+  }
+  .dax-scan-frame[data-target='barcode'] .dax-scan-laser {
+    top: 50%;
+    opacity: 1;
+  }
+}
+
+/* "Scan with phone": a quiet header link, desktop only */
+.dax-phone-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--dax-line-strong);
+  border-radius: 999px;
+  padding: 9px 16px 9px 12px;
+  background: var(--dax-panel);
+  color: var(--dax-ink);
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dax-phone-btn:hover {
+  background: var(--dax-soft);
+}
+/* QR stays black on white in dark mode so phones can read it */
+.dax-phone-qr {
+  padding: 14px;
+  border-radius: 16px;
+  background: #ffffff;
+  line-height: 0;
+}
+@media (max-width: 900px) {
+  .dax-phone-btn {
+    display: none;
+  }
+}
+
+/* Scan with a phone: connect card + live list */
+.dax-phone-live {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--dax-ok);
+  box-shadow: 0 0 0 0 rgba(29, 154, 96, 0.5);
+  animation: dax-live 1.6s infinite;
+}
+@keyframes dax-live {
+  70% {
+    box-shadow: 0 0 0 10px rgba(29, 154, 96, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(29, 154, 96, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dax-phone-live {
+    animation: none;
+  }
+}
+
+/* Scanner camera box: one fixed size whatever its state */
+.dax-scan-box {
+  container-type: size;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--mantine-radius-md);
+  overflow: hidden;
+}
+.dax-scan-notice {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* Phone scan line details */
+.dax-figs-mini {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 14px;
+  color: var(--dax-muted);
+}
+.dax-figs-mini b {
+  color: var(--dax-ink);
+  font-variant-numeric: tabular-nums;
+}
+.dax-bin-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dax-bin-list li {
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: var(--dax-soft);
+  font-size: 13px;
+}
+
+/* Scanner, compact: round tool buttons floating on the camera */
+.dax-scan-tools {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+.dax-scan-tools button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(15, 20, 24, 0.55);
+  color: #ffffff;
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+.dax-scan-tools button[aria-pressed='true'] {
+  background: rgba(255, 255, 255, 0.92);
+  color: #12232a;
+}
+
+/* Scan with a phone (PC) */
+.dax-pp {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.dax-pp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dax-pp-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dax-pp-list-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.dax-pp-list-head .dax-muted {
+  font-size: 13px;
+}
+.dax-pp-empty {
+  padding: 24px;
+  border-radius: var(--dax-radius-card);
+  background: var(--dax-panel);
+  box-shadow: var(--dax-shadow-card);
+}
+.dax-pp-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dax-pp-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: var(--dax-panel);
+  border: 1px solid var(--dax-line);
+  box-shadow: var(--dax-shadow-card);
+  animation: dax-pp-in 0.25s ease-out;
+}
+.dax-pp-line:not([data-known]) {
+  border-color: color-mix(in srgb, var(--dax-hi) 40%, transparent);
+  background: linear-gradient(90deg, var(--dax-hi-soft), var(--dax-panel) 40%);
+}
+@keyframes dax-pp-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dax-pp-line {
+    animation: none;
+  }
+}
+.dax-pp-line-ico {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--dax-ok-soft);
+  color: var(--dax-ok);
+}
+.dax-pp-line:not([data-known]) .dax-pp-line-ico {
+  background: var(--dax-hi-soft);
+  color: var(--dax-hi);
+}
+.dax-pp-line-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dax-pp-line-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 700;
+}
+.dax-pp-brand {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--dax-int-soft);
+  color: var(--dax-int);
+}
+.dax-pp-line-desc {
+  color: var(--dax-muted);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dax-pp-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.dax-pp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--dax-soft);
+  color: var(--dax-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.dax-pp-tag.strong {
+  background: var(--dax-ink);
+  color: var(--dax-on-ink);
+}
+.dax-pp-tag.code .dax-mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dax-pp-tag.link {
+  color: var(--dax-int);
+  background: var(--dax-int-soft);
+}
+.dax-pp-line-stock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+  font-size: 13px;
+  color: var(--dax-muted);
+}
+.dax-pp-line-stock b {
+  color: var(--dax-ink);
+  font-variant-numeric: tabular-nums;
+}
+.dax-pp-ago {
+  font-size: 11.5px;
+  opacity: 0.8;
+}
+.dax-pp-line-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.dax-pp-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--dax-soft);
+}
+.dax-pp-stepper button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--dax-panel);
+  color: var(--dax-ink);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.dax-pp-stepper button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.dax-pp-stepper span {
+  min-width: 56px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.dax-pp-stepper small {
+  margin-left: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dax-muted);
+}
+.dax-pp-remove {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dax-muted);
+  cursor: pointer;
+}
+.dax-pp-remove:hover {
+  background: var(--dax-bad-soft);
+  color: var(--dax-bad);
+}
+@media (max-width: 1100px) {
+  .dax-pp-line {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .dax-pp-line-stock {
+    grid-column: 2;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+  .dax-pp-line-side {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+/* Scan with a phone (PC): a quiet connection card */
+.dax-pp-hero {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 24px;
+  border-radius: var(--dax-radius-card);
+  background: var(--dax-panel);
+  box-shadow: var(--dax-shadow-card);
+  min-width: 0;
+}
+.dax-pp-qr {
+  flex: none;
+  padding: 6px;
+  border-radius: 18px;
+  border: 1px solid var(--dax-line);
+}
+.dax-pp-qr .dax-phone-qr {
+  padding: 8px;
+  border-radius: 12px;
+}
+.dax-pp-hero-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dax-pp-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.dax-pp-status h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dax-pp-phone {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--dax-soft);
+  color: var(--dax-muted);
+}
+.dax-pp-hero[data-status='PAIRED'] .dax-pp-phone {
+  background: var(--dax-ok);
+  color: #ffffff;
+  animation: dax-live 1.8s infinite;
+}
+.dax-pp-timer {
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--dax-soft);
+  font-family: var(--dax-f-mono);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dax-pp-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+}
+.dax-pp-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.dax-pp-steps li > span {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--dax-brand);
+  color: var(--dax-on-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+.dax-pp-steps li > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dax-pp-steps small {
+  color: var(--dax-muted);
+  font-size: 12.5px;
+}
+.dax-pp-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(420px, 100%);
+  padding: 5px 6px 5px 10px;
+  border: 1px solid var(--dax-line);
+  border-radius: 10px;
+  background: var(--dax-soft);
+  color: var(--dax-ink);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.dax-pp-url .dax-mono {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.dax-pp-url em {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 7px;
+  background: var(--dax-panel);
+  font-style: normal;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--dax-brand);
+}
+.dax-pp-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--dax-muted);
+}
+.dax-pp-stats span {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--dax-soft);
+}
+.dax-pp-stats b {
+  color: var(--dax-ink);
+  font-variant-numeric: tabular-nums;
+}
+.dax-pp-stats span[data-warn] {
+  background: var(--dax-hi-soft);
+}
+.dax-pp-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--dax-muted);
+}
+@media (max-width: 700px) {
+  .dax-pp-hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dax-pp-qr {
+    align-self: center;
+  }
+}
+
+/* Phone scanner page (/p): camera fills the screen, a themed sheet sits on
+   the bottom. Every part has a fixed size so nothing shifts while scanning. */
+.dax-ps {
+  /* Sheet height: just the pairing steps, or room for scans once paired */
+  --ps-sheet-max: min(46dvh, 420px);
+  --ps-sheet: min(
+    calc(292px + env(safe-area-inset-bottom, 0px)),
+    var(--ps-sheet-max)
+  );
+  --ps-lip: 26px;
+  --ps-top: max(12px, env(safe-area-inset-top));
+  --ps-glass: color-mix(in srgb, var(--dax-panel) 86%, transparent);
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000000;
+  color: var(--dax-ink);
+}
+.dax-ps[data-live] {
+  --ps-sheet: var(--ps-sheet-max);
+}
+/* The camera never resizes (resizing live video is what makes it lag);
+   only the frame and buttons move to stay clear of the sheet. */
+.dax-ps-camera {
+  position: absolute;
+  inset: 0;
+}
+/* Centre the frame between the aim text and the sheet */
+.dax-ps-camera .dax-scan-frame {
+  top: calc(var(--ps-top) + 84px);
+  bottom: calc(var(--ps-sheet) + 72px);
+}
+.dax-ps-camera .dax-scan-tools {
+  right: 20px;
+  bottom: calc(var(--ps-sheet) + 16px);
+  gap: 12px;
+}
+.dax-ps-camera .dax-scan-notice {
+  padding-bottom: calc(var(--ps-sheet) + 20px);
+}
+
+/* Floating status over the camera */
+.dax-ps-top {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+.dax-ps-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--ps-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: auto;
+}
+.dax-ps-status {
+  min-width: 0;
+}
+.dax-ps-status svg {
+  flex: none;
+  color: var(--dax-muted);
+}
+.dax-ps[data-live] .dax-ps-status svg {
+  color: var(--dax-ok);
+}
+.dax-ps-who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dax-ps-time {
+  flex: none;
+  font-family: var(--dax-f-mono);
+  font-variant-numeric: tabular-nums;
+}
+.dax-ps-time svg {
+  color: var(--dax-muted);
+}
+.dax-ps-aim {
+  position: absolute;
+  top: calc(var(--ps-top) + 52px);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  margin: 0;
+  text-align: center;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+/* Bottom sheet */
+.dax-ps-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  box-sizing: border-box;
+  /* Always full height; slid down so only the visible part shows. Sliding
+     (transform) is smooth, changing the height is not. */
+  height: var(--ps-sheet-max);
+  transform: translateY(max(0px, calc(var(--ps-sheet-max) - var(--ps-sheet))));
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+  width: min(560px, 100%);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 16px max(14px, env(safe-area-inset-bottom));
+  border-radius: 28px 28px 0 0;
+  background: var(--dax-panel);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.28);
+}
+.dax-ps-sheet > * {
+  flex: none;
+}
+.dax-ps-grip {
+  align-self: center;
+  width: 40px;
+  height: 5px;
+  margin-bottom: 4px;
+  border-radius: 999px;
+  background: var(--dax-line-strong);
+}
+
+/* Last result */
+.dax-ps-result {
+  box-sizing: border-box;
+  height: 88px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 12px 12px;
+  border-radius: 20px;
+  background: var(--dax-soft);
+  border: 1px solid var(--dax-line);
+}
+.dax-ps-result-ico {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--dax-int-soft);
+  color: var(--dax-int);
+}
+.dax-ps-result[data-tone='ok'] {
+  border-color: color-mix(in srgb, var(--dax-ok) 35%, var(--dax-line));
+}
+.dax-ps-result[data-tone='ok'] .dax-ps-result-ico {
+  background: var(--dax-ok-soft);
+  color: var(--dax-ok);
+}
+.dax-ps-result[data-tone='miss'] {
+  border-color: color-mix(in srgb, var(--dax-hi) 35%, var(--dax-line));
+}
+.dax-ps-result[data-tone='miss'] .dax-ps-result-ico {
+  background: var(--dax-hi-soft);
+  color: var(--dax-hi);
+}
+.dax-ps-result-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.dax-ps-result-text b {
+  font-size: 15.5px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dax-ps-result-text span {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--dax-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dax-ps-result-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.dax-ps-qty {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.dax-ps-format {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--dax-panel);
+  border: 1px solid var(--dax-line);
+  color: var(--dax-brand);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Photo button or hint */
+.dax-ps-action {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--dax-muted);
+}
+.dax-ps-action > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dax-ps-action .mantine-Button-root {
+  flex: none;
+}
+
+/* Recent scans: the only part that scrolls */
+.dax-ps-recent {
+  flex: 1 1 0 !important;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--dax-line);
+  padding-top: 10px;
+}
+.dax-ps-recent h2 {
+  margin: 0 0 4px 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dax-muted);
+}
+.dax-ps-recent ol {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.dax-ps-recent li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--dax-line);
+  font-size: 14px;
+}
+.dax-ps-recent li:first-child {
+  border-top: 0;
+}
+.dax-ps-recent li svg {
+  color: var(--dax-ok);
+}
+.dax-ps-recent li[data-tone='miss'] svg {
+  color: var(--dax-hi);
+}
+.dax-ps-recent .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dax-ps-recent .f {
+  font-size: 11px;
+  color: var(--dax-muted);
+}
+.dax-ps-recent .q {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dax-ps-empty {
+  margin: 8px 2px;
+  color: var(--dax-muted);
+  font-size: 14px;
+}
+
+/* Not connected: how to pair */
+.dax-ps-pair {
+  flex: 1 1 0 !important;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 4px 0;
+}
+.dax-ps-pair h1 {
+  margin: 0 0 4px;
+  font-size: 21px;
+  font-weight: 800;
+}
+.dax-ps-pair-error {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--dax-bad-soft);
+  color: var(--dax-bad);
+  font-size: 13.5px;
+}
+.dax-ps-pair ol {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dax-ps-pair li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+.dax-ps-pair li > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--dax-int-soft);
+  color: var(--dax-brand);
+  font-weight: 800;
+  font-size: 14px;
+}
+.dax-ps-pair li div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 5px;
+}
+.dax-ps-pair li b {
+  font-size: 15px;
+}
+.dax-ps-pair li small {
+  font-size: 13px;
+  color: var(--dax-muted);
+}
+.dax-ps-pair em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--dax-ink);
+}
+
+/* Scan with a phone: turn the list into a document */
+.dax-pp-use {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 14px 18px;
+  border-radius: 20px;
+  background: var(--dax-panel);
+  border: 1px solid var(--dax-line);
+  box-shadow: var(--dax-shadow-card);
+}
+.dax-pp-use-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dax-pp-use-text span {
+  font-size: 13px;
+  color: var(--dax-muted);
+}
+.dax-pp-use-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Scan with a phone: ticking lines and per-line menu */
+.dax-pp-line-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dax-pp-line[data-selected] {
+  border-color: var(--dax-brand);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--dax-brand) 22%, transparent),
+    var(--dax-shadow-card);
+}
+.dax-pp-list-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dax-pp-use[data-selected] {
+  border-color: var(--dax-brand);
+  background: color-mix(in srgb, var(--dax-int-soft) 60%, var(--dax-panel));
+}
+
+/* Scanner, fill: the camera takes all the space its parent gives it */
+.dax-scan-fill {
+  height: 100%;
+}
+.dax-scan-fill > .dax-scan-box {
+  aspect-ratio: auto;
+  height: 100%;
+  border-radius: 0;
 }
