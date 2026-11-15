@@ -5,6 +5,7 @@ type ItemField = keyof typeof Prisma.ItemScalarFieldEnum;
 type BinField = keyof typeof Prisma.BinScalarFieldEnum;
 type BrandField = keyof typeof Prisma.BrandScalarFieldEnum;
 type MachineModelField = keyof typeof Prisma.MachineModelScalarFieldEnum;
+type MachineTypeField = keyof typeof Prisma.MachineTypeScalarFieldEnum;
 type GrnField = keyof typeof Prisma.GrnScalarFieldEnum;
 type DiscrepancyField = keyof typeof Prisma.DiscrepancyScalarFieldEnum;
 type HoldField = keyof typeof Prisma.HoldScalarFieldEnum;
@@ -77,6 +78,37 @@ export const itemEntity = defineEntity<ItemField>({
     },
     qrToken: { label: 'QR token', tier: 'INTERNAL' },
     notes: { label: 'Notes', tier: 'INTERNAL', writable: true },
+    supplierId: {
+      label: 'Main supplier',
+      tier: 'INTERNAL',
+      locked: true,
+      writable: true,
+      filterable: true,
+    },
+    supplierName: {
+      label: 'Main supplier name',
+      tier: 'INTERNAL',
+      locked: true,
+    },
+    tags: {
+      label: 'Tags',
+      tier: 'INTERNAL',
+      locked: true,
+      writable: true,
+      filterable: true,
+    },
+    preCostPrice: {
+      label: 'Pre-costing price',
+      tier: 'INTERNAL',
+      locked: true,
+      writable: true,
+    },
+    sellingPrice: {
+      label: 'Selling price',
+      tier: 'INTERNAL',
+      locked: true,
+      writable: true,
+    },
     version: { label: 'Version', tier: 'INTERNAL', locked: true },
     createdAt: { label: 'Created', tier: 'INTERNAL', locked: true },
     createdBy: { label: 'Created by', tier: 'INTERNAL' },
@@ -157,6 +189,26 @@ export const machineModelEntity = defineEntity<MachineModelField>({
       locked: true,
       writable: true,
     },
+    machineTypeId: {
+      label: 'Machine type',
+      tier: 'INTERNAL',
+      locked: true,
+      writable: true,
+    },
+    active: { label: 'Active', tier: 'INTERNAL', locked: true, writable: true },
+    createdAt: { label: 'Created', tier: 'INTERNAL', locked: true },
+    updatedAt: { label: 'Updated', tier: 'INTERNAL', locked: true },
+  },
+});
+
+export const machineTypeEntity = defineEntity<MachineTypeField>({
+  key: 'inventory.machine_type',
+  moduleKey: 'inventory',
+  label: 'Machine types',
+  table: 'inventory.machine_type',
+  fields: {
+    id: { label: 'ID', tier: 'INTERNAL', locked: true },
+    name: { label: 'Name', tier: 'INTERNAL', locked: true, writable: true },
     active: { label: 'Active', tier: 'INTERNAL', locked: true, writable: true },
     createdAt: { label: 'Created', tier: 'INTERNAL', locked: true },
     updatedAt: { label: 'Updated', tier: 'INTERNAL', locked: true },
@@ -407,6 +459,7 @@ export const INVENTORY_ENTITIES: readonly EntityDef[] = [
   binEntity,
   brandEntity,
   machineModelEntity,
+  machineTypeEntity,
   grnEntity,
   discrepancyEntity,
   holdEntity,

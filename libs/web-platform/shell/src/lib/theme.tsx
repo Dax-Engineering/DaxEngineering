@@ -70,7 +70,8 @@ const field = { radius: 'lg' as const, size: 'md' as const };
 
 export const daxTheme = createTheme({
   primaryColor: 'ink',
-  primaryShade: { light: 9, dark: 1 },
+  // Dark mode: mid shades, so filled buttons stay strong with white text.
+  primaryShade: { light: 9, dark: 4 },
   autoContrast: true,
   colors: { ink, ember, ok },
   fontFamily: 'var(--dax-f-body)',

@@ -37,6 +37,12 @@ function copyScannerWasm() {
 }
 copyScannerWasm();
 
+// Host of the dev phone tunnel (set by `pnpm dev:phone`); never used in production.
+const phoneHost =
+  process.env['NODE_ENV'] !== 'production' && process.env['WEB_PHONE_ORIGIN']
+    ? new URL(process.env['WEB_PHONE_ORIGIN']).host
+    : null;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Standalone output needs symlinks, which Windows blocks without Developer Mode.
@@ -53,9 +59,14 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
+  // `pnpm dev:phone` serves dev through a Cloudflare tunnel so phones get https.
+  ...(phoneHost ? { allowedDevOrigins: [phoneHost] } : {}),
   experimental: {
     // CSV imports go through server actions; files are capped at 2 MB.
-    serverActions: { bodySizeLimit: '3mb' },
+    serverActions: {
+      bodySizeLimit: '3mb',
+      ...(phoneHost ? { allowedOrigins: [phoneHost] } : {}),
+    },
   },
   async headers() {
     return [

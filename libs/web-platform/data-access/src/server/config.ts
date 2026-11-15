@@ -6,6 +6,11 @@ export interface ServerConfig {
   apiUrl: string;
   internalToken: string;
   publicOrigin: string;
+  /**
+   * Addresses browser requests may come from: the public origin, plus in
+   * development the phone tunnel (`<APP>_PHONE_ORIGIN`, set by pnpm dev:phone).
+   */
+  trustedOrigins: string[];
 }
 
 export function readServerConfig(
@@ -21,10 +26,14 @@ export function readServerConfig(
   if (missing.length) {
     throw new Error(`Missing server environment: ${missing.join(', ')}`);
   }
+  const publicOrigin = env[names.publicOrigin] as string;
+  const phone = env[`${app.toUpperCase()}_PHONE_ORIGIN`];
+  const dev = env['NODE_ENV'] !== 'production';
   return {
     apiUrl: env[names.apiUrl] as string,
     internalToken: env[names.internalToken] as string,
-    publicOrigin: env[names.publicOrigin] as string,
+    publicOrigin,
+    trustedOrigins: dev && phone ? [publicOrigin, phone] : [publicOrigin],
   };
 }
 

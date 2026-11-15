@@ -85,7 +85,7 @@ async function relayJson(upstream: Response): Promise<Response> {
 export function createFileRoutes(app: AppName) {
   async function upload(request: Request): Promise<Response> {
     const config = readServerConfig(app);
-    if (!isSameOrigin(request, config.publicOrigin)) return plain(403);
+    if (!isSameOrigin(request, config.trustedOrigins)) return plain(403);
     const contentType = request.headers.get('content-type') ?? '';
     if (!/^multipart\/form-data;\s*boundary=/i.test(contentType))
       return plain(415);

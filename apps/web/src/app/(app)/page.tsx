@@ -22,10 +22,16 @@ import { getInventorySummary, listStock } from './inventory/_lib/data';
 import { getIssuingSummary } from './inventory/issuing/_lib/data';
 import { getReceivingSummary } from './inventory/receiving/_lib/data';
 import { getPartiesSummary } from './parties/_party/data';
+import { StartOnScan } from '../../components/start-on-scan';
+import { flatten, type SearchParams } from '../../lib/query';
 
 const count = new Intl.NumberFormat('en-LK');
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const caps = await requireCapabilities();
   const can = (p: string) => canDo(caps, p);
   const canSeeItems = can('inventory.item.view');
@@ -100,7 +106,7 @@ export default async function HomePage() {
     tiles.push({
       href: '/scan',
       title: 'Scan a label',
-      sub: 'Point the camera at a bin or item label.',
+      sub: 'Use a phone camera on a bin or item label.',
       icon: 'scan',
       use: 'often',
     });
@@ -250,8 +256,10 @@ export default async function HomePage() {
       : []),
   ];
 
+  const fromApp = flatten(await searchParams)['from'] === 'app';
   return (
     <>
+      {fromApp && canScan ? <StartOnScan /> : null}
       <PageHead
         eyebrow={todayLabel()}
         title={`${greeting()}, ${firstName}`}

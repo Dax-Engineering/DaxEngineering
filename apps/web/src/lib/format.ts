@@ -7,6 +7,18 @@ export function formatQty(value: string): string {
   return Number.isFinite(n) ? number.format(n) : value;
 }
 
+const money = new Intl.NumberFormat('en-LK', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** Rupee amount, or a dash when there is none. */
+export function formatMoney(value: string | null): string {
+  if (value === null) return '—';
+  const n = Number(value);
+  return Number.isFinite(n) ? `Rs ${money.format(n)}` : value;
+}
+
 export function trimQty(value: string): string {
   return value.includes('.') ? value.replace(/\.?0+$/, '') : value;
 }

@@ -61,12 +61,89 @@ async function signOut() {
   window.location.assign('/login');
 }
 
+/**
+ * The phone bottom bar: three screens around a raised Scan button, and the
+ * rest under More. `keys` picks which screens get a slot, in order.
+ */
+function BottomBar({
+  nav,
+  keys,
+  currentKey,
+  scan,
+}: {
+  nav: ShellNavItem[];
+  keys: string[];
+  currentKey: string | undefined;
+  scan?: { href: string; label: string };
+}) {
+  const chosen = [
+    ...keys.flatMap((k) => nav.filter((n) => n.key === k)),
+    ...nav.filter((n) => !keys.includes(n.key)),
+  ];
+  const slots = chosen.slice(0, 3);
+  const more = chosen.slice(3);
+  const moreActive = more.some((m) => m.key === currentKey);
+  const link = (item: ShellNavItem) => (
+    <Link
+      key={item.key}
+      href={item.path}
+      aria-current={currentKey === item.key ? 'page' : undefined}
+    >
+      <Icon name={item.icon} />
+      <span>{item.label}</span>
+    </Link>
+  );
+  return (
+    <nav className="dax-bottom" aria-label="Screens">
+      {slots.slice(0, 2).map(link)}
+      {scan ? (
+        <Link
+          href={scan.href}
+          className="dax-bottom-scan"
+          aria-label={scan.label}
+        >
+          <Icon name="scan" size={26} />
+          <span>{scan.label}</span>
+        </Link>
+      ) : null}
+      {slots.slice(2).map(link)}
+      {more.length ? (
+        <Menu position="top-end" radius="lg" shadow="xl" width={220}>
+          <MenuTarget>
+            <button
+              type="button"
+              aria-current={moreActive ? 'page' : undefined}
+            >
+              <Icon name="grid" />
+              <span>More</span>
+            </button>
+          </MenuTarget>
+          <MenuDropdown>
+            {more.map((item) => (
+              <MenuItem
+                key={item.key}
+                component={Link}
+                href={item.path}
+                leftSection={<Icon name={item.icon} size={18} />}
+              >
+                {item.label}
+              </MenuItem>
+            ))}
+          </MenuDropdown>
+        </Menu>
+      ) : null}
+    </nav>
+  );
+}
+
 export function DaxShell({
   appLabel,
   userName,
   userNote,
   nav,
   actions,
+  scan,
+  mobileKeys = [],
   securityPath = '/account/security',
   children,
 }: {
@@ -75,6 +152,10 @@ export function DaxShell({
   userNote?: string;
   nav: ShellNavItem[];
   actions?: ReactNode;
+  /** Shows a raised Scan button in the phone bottom bar. */
+  scan?: { href: string; label: string };
+  /** Screens that get a slot in the phone bottom bar, in order. */
+  mobileKeys?: string[];
   securityPath?: string;
   children: ReactNode;
 }) {
@@ -165,6 +246,12 @@ export function DaxShell({
             </Link>
           ))}
         </nav>
+        <BottomBar
+          nav={nav}
+          keys={mobileKeys}
+          currentKey={current?.key}
+          scan={scan}
+        />
         <main className="dax-main">
           {tabs ? (
             <nav className="dax-tabs" aria-label={current?.label}>

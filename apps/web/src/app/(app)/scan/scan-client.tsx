@@ -2,41 +2,32 @@
 
 import { Alert, Stack, Text } from '@mantine/core';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, useTransition } from 'react';
-import { LinkList, Mono, Scanner } from '@dax/web-shell';
+import { useState } from 'react';
+import { LinkList, Mono, type ScanReply, Scanner } from '@dax/web-shell';
 import { type ScanOutcome, scanCode } from './actions';
 
 export function ScanClient({ notice }: { notice: string | null }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
   const [last, setLast] = useState<{
     code: string;
     outcome: ScanOutcome;
   } | null>(null);
-  const busy = useRef(false);
 
-  function handle(code: string) {
-    if (busy.current) return;
-    busy.current = true;
-    startTransition(async () => {
-      try {
-        const outcome = await scanCode(code);
-        if (outcome.type === 'go') {
-          router.push(outcome.path);
-          return;
-        }
-        setLast({ code, outcome });
-      } finally {
-        busy.current = false;
-      }
-    });
+  async function handle(code: string): Promise<ScanReply> {
+    const outcome = await scanCode(code);
+    if (outcome.type === 'go') {
+      router.push(outcome.path);
+      return 'ok';
+    }
+    setLast({ code, outcome });
+    return outcome.type === 'choices' ? 'ok' : 'miss';
   }
 
   const outcome = last?.outcome;
   return (
     <Stack gap="md">
       {notice && !last ? <Alert color="orange">{notice}</Alert> : null}
-      <Scanner onCode={handle} busy={pending} />
+      <Scanner onCode={handle} />
       {outcome?.type === 'none' && last ? (
         <Alert color="orange" title="Nothing found">
           No item or bin matches <Mono>{last.code}</Mono>. Check the code, or

@@ -21,7 +21,13 @@ import { ConfirmAction } from '../../../../../components/confirm-action';
 import { PrintLabelsButton } from '../../../../../components/labels';
 import { AppLink } from '../../../../../components/links';
 import { BelowMinBadge, StockPanel } from '../../../../../components/stock';
-import { formatDateTime, formatQty, uomLabel } from '../../../../../lib/format';
+import { names, TagChips } from '../../../../../components/item-extras';
+import {
+  formatDateTime,
+  formatMoney,
+  formatQty,
+  uomLabel,
+} from '../../../../../lib/format';
 import { optional, uuidParam } from '../../../../../lib/load';
 import { requirePermission } from '../../../../../lib/server';
 import { getCatalog, getItem } from '../../_lib/data';
@@ -187,6 +193,17 @@ export default async function ItemPage({
               {
                 label: 'Fits machine models',
                 value: item.machineModels.map((m) => m.name).join(', ') || '—',
+              },
+              { label: 'Machine types', value: names(item.machineTypes) },
+              { label: 'Main supplier', value: item.supplier?.name ?? '—' },
+              {
+                label: 'Pre-costing price',
+                value: formatMoney(item.preCostPrice),
+              },
+              { label: 'Selling price', value: formatMoney(item.sellingPrice) },
+              {
+                label: 'Tags',
+                value: item.tags.length ? <TagChips tags={item.tags} /> : '—',
               },
               {
                 label: 'Notes',

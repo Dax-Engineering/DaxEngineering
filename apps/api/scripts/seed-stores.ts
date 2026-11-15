@@ -18,6 +18,7 @@ import {
   INVENTORY_ENTITIES,
   ItemsService,
   machineModelEntity,
+  machineTypeEntity,
   LocationsService,
   MainStore,
   StockPostingService,
@@ -38,8 +39,10 @@ import {
   BIN_LAYOUT,
   BRANDS,
   CUSTOMERS,
+  ITEM_EXTRAS,
   ITEMS,
   MACHINE_MODELS,
+  MACHINE_TYPES,
   SEED_USERS,
   SUPPLIERS,
   ZONES,
@@ -181,6 +184,34 @@ async function main() {
         }));
       brandId.set(name, id);
     }
+    console.log(`Machine types (${MACHINE_TYPES.length})`);
+    const typeId = new Map<string, string>();
+    for (const name of MACHINE_TYPES) {
+      const found = await prisma.machineType.findUnique({
+        where: { name },
+        select: { id: true },
+      });
+      const id =
+        found?.id ??
+        (await prisma.$transaction(async (tx) => {
+          const row = await tx.machineType.create({
+            data: { name },
+            select: { id: true },
+          });
+          await keeperAudit.record(
+            {
+              moduleKey: 'inventory',
+              entityKey: machineTypeEntity.key,
+              entityId: row.id,
+              action: 'create',
+              after: { name },
+            },
+            tx,
+          );
+          return row.id;
+        }));
+      typeId.set(name, id);
+    }
     const modelId = new Map<string, string>();
     for (const m of MACHINE_MODELS) {
       const found = await prisma.machineModel.findUnique({
@@ -190,7 +221,11 @@ async function main() {
       const id =
         found?.id ??
         (await prisma.$transaction(async (tx) => {
-          const data = { name: m.name, brandId: brandId.get(m.brand) ?? null };
+          const data = {
+            name: m.name,
+            brandId: brandId.get(m.brand) ?? null,
+            machineTypeId: typeId.get(m.type) ?? null,
+          };
           const row = await tx.machineModel.create({
             data,
             select: { id: true },
@@ -232,9 +267,22 @@ async function main() {
       return id;
     };
 
+    // Suppliers first: items name their main supplier.
+    console.log(
+      `Customers (${CUSTOMERS.length}) and suppliers (${SUPPLIERS.length})`,
+    );
+    const actor = { userId: SEED_USERS.keeper.id, policy: keeper };
+    for (const c of CUSTOMERS) await parties.create(CUSTOMER_KIND, actor, c);
+    const supplierId = new Map<string, string>();
+    for (const s of SUPPLIERS) {
+      const created = await parties.create(SUPPLIER_KIND, actor, s);
+      supplierId.set(s.name, created.id);
+    }
+
     console.log(`Items (${ITEMS.length})`);
     const itemId = new Map<string, string>();
     for (const it of ITEMS) {
+      const extra = ITEM_EXTRAS[it.partNo];
       const created = await items.create(keeper, {
         partNo: it.partNo,
         brandId: need(brandId, it.brand, 'brand'),
@@ -245,16 +293,13 @@ async function main() {
         machineModelIds: it.models.map((m) =>
           need(modelId, m, 'machine model'),
         ),
+        supplierId: extra ? need(supplierId, extra.supplier, 'supplier') : null,
+        tags: extra?.tags ?? [],
+        preCostPrice: extra?.preCost ?? null,
+        sellingPrice: extra?.selling ?? null,
       });
       itemId.set(`${it.brand}|${it.partNo}`, created.id);
     }
-
-    console.log(
-      `Customers (${CUSTOMERS.length}) and suppliers (${SUPPLIERS.length})`,
-    );
-    const actor = { userId: SEED_USERS.keeper.id, policy: keeper };
-    for (const c of CUSTOMERS) await parties.create(CUSTOMER_KIND, actor, c);
-    for (const s of SUPPLIERS) await parties.create(SUPPLIER_KIND, actor, s);
 
     // Opening stock goes through an opening count, the same way a real store
     // would load it: the keeper counts and submits, a second person approves.

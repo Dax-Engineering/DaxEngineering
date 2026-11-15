@@ -32,7 +32,7 @@ const SEED_TABLES = `
   CREATE TEMP TABLE seed_created ON COMMIT DROP AS
     SELECT DISTINCT entity_key, entity_id::uuid AS id FROM audit.audit_log
     WHERE actor_id = ANY($1::uuid[]) AND action = 'create'
-      AND entity_key IN ('inventory.brand', 'inventory.machine_model', 'inventory.zone');
+      AND entity_key IN ('inventory.brand', 'inventory.machine_model', 'inventory.machine_type', 'inventory.zone');
   CREATE TEMP TABLE seed_count ON COMMIT DROP AS
     SELECT id FROM inventory.stock_count WHERE created_by = ANY($1::uuid[]);
   CREATE TEMP TABLE seed_grn ON COMMIT DROP AS
@@ -215,6 +215,10 @@ const DELETES: [label: string, sql: string][] = [
     `DELETE FROM inventory.machine_model m WHERE id IN (SELECT id FROM seed_created WHERE entity_key = 'inventory.machine_model') AND NOT EXISTS (SELECT 1 FROM inventory.item_machine_model x WHERE x.machine_model_id = m.id) AND NOT EXISTS (SELECT 1 FROM inventory.warranty_tag w WHERE w.machine_model_id = m.id)`,
   ],
   [
+    'machine types',
+    `DELETE FROM inventory.machine_type t WHERE id IN (SELECT id FROM seed_created WHERE entity_key = 'inventory.machine_type') AND NOT EXISTS (SELECT 1 FROM inventory.machine_model m WHERE m.machine_type_id = t.id)`,
+  ],
+  [
     'brands',
     `DELETE FROM inventory.brand b WHERE id IN (SELECT id FROM seed_created WHERE entity_key = 'inventory.brand') AND NOT EXISTS (SELECT 1 FROM inventory.item i WHERE i.brand_id = b.id) AND NOT EXISTS (SELECT 1 FROM inventory.machine_model m WHERE m.brand_id = b.id)`,
   ],
@@ -224,7 +228,7 @@ const DELETES: [label: string, sql: string][] = [
   ],
   [
     'suppliers',
-    `DELETE FROM parties.supplier WHERE id IN (SELECT id FROM seed_supplier)`,
+    `DELETE FROM parties.supplier s WHERE id IN (SELECT id FROM seed_supplier) AND NOT EXISTS (SELECT 1 FROM inventory.item i WHERE i.supplier_id = s.id)`,
   ],
 ];
 

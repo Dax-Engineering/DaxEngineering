@@ -13,3 +13,5 @@ export * from './lib/icon';
 export * from './lib/ui';
 export * from './lib/logo';
 export * from './lib/pager';
+export * from './lib/scan-feedback';
+export * from './lib/qr-box';

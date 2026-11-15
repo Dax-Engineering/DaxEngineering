@@ -90,7 +90,7 @@ export class LabelsController {
       if (!row) invalid('Some of the selected items were not found.', ['ids']);
       return {
         kind: 'item',
-        url: qrUrl(this.origins.web, 'item', row.qrToken),
+        url: qrUrl(this.origins.labels, 'item', row.qrToken),
         partNo: row.partNo,
         brand: row.brand.name,
         description: row.description,
@@ -116,7 +116,7 @@ export class LabelsController {
       if (!row) invalid('Some of the selected bins were not found.', ['ids']);
       return {
         kind: 'bin',
-        url: qrUrl(this.origins.web, 'bin', row.qrToken),
+        url: qrUrl(this.origins.labels, 'bin', row.qrToken),
         code: row.code,
         zone: row.zone.name,
         binKind: row.kind === 'STORAGE' ? null : row.kind,

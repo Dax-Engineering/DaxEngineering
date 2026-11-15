@@ -6,3 +6,4 @@ export * from './lib/counts';
 export * from './lib/reports';
 export * from './lib/returns';
 export * from './lib/warranty';
+export * from './lib/phone-scan';

@@ -26,12 +26,13 @@ import {
   SelectionHint,
 } from '../../../../components/labels';
 import { LinkButton } from '../../../../components/links';
+import { TagChips } from '../../../../components/item-extras';
 import { ListFilters } from '../../../../components/list-filters';
 import { BelowMinBadge, StockLine } from '../../../../components/stock';
-import { formatCount, formatQty } from '../../../../lib/format';
+import { formatCount, formatMoney, formatQty } from '../../../../lib/format';
 import { flatten, type SearchParams } from '../../../../lib/query';
 import { requirePermission } from '../../../../lib/server';
-import { getCatalog, listItems } from '../_lib/data';
+import { getCatalog, itemFilterSelects, listItems } from '../_lib/data';
 
 function ItemBadges({ item }: { item: ItemSummary }) {
   return (
@@ -50,13 +51,20 @@ export default async function ItemsPage({
 }) {
   const caps = await requirePermission('inventory.item.view');
   const query = flatten(await searchParams);
-  const [catalog, page] = await Promise.all([getCatalog(), listItems(query)]);
+  const [catalog, page, extraSelects] = await Promise.all([
+    getCatalog(),
+    listItems(query),
+    itemFilterSelects(),
+  ]);
   const canPrint = canDo(caps, 'inventory.item.print_label');
   const ids = page.items.map((i) => i.id);
   const filtered = Boolean(
     query['q'] ||
     query['brandId'] ||
     query['machineModelId'] ||
+    query['supplierId'] ||
+    query['machineTypeId'] ||
+    query['tag'] ||
     query['belowMin'],
   );
 
@@ -113,6 +121,7 @@ export default async function ItemsPage({
                   label: m.brand ? `${m.name} (${m.brand.name})` : m.name,
                 })),
               },
+              ...extraSelects,
               {
                 name: 'status',
                 label: 'Show',
@@ -151,9 +160,11 @@ export default async function ItemsPage({
                     <TableTh>Part number</TableTh>
                     <TableTh>Brand</TableTh>
                     <TableTh>Description</TableTh>
+                    <TableTh>Supplier</TableTh>
                     <TableTh ta="right">On hand</TableTh>
                     <TableTh ta="right">Held</TableTh>
                     <TableTh ta="right">Free</TableTh>
+                    <TableTh ta="right">Selling</TableTh>
                     <TableTh />
                   </TableTr>
                 </TableThead>
@@ -174,7 +185,11 @@ export default async function ItemsPage({
                         </Link>
                       </TableTd>
                       <TableTd>{item.brand.name}</TableTd>
-                      <TableTd>{item.description}</TableTd>
+                      <TableTd>
+                        {item.description}
+                        <TagChips tags={item.tags} />
+                      </TableTd>
+                      <TableTd>{item.supplier?.name ?? '—'}</TableTd>
                       <TableTd className="dax-num">
                         {formatQty(item.stock.onHand)}
                       </TableTd>
@@ -184,6 +199,9 @@ export default async function ItemsPage({
                       <TableTd className="dax-num">
                         <b>{formatQty(item.stock.free)}</b>{' '}
                         <span className="dax-muted">{item.uom}</span>
+                      </TableTd>
+                      <TableTd className="dax-num">
+                        {formatMoney(item.sellingPrice)}
                       </TableTd>
                       <TableTd>
                         <ItemBadges item={item} />
@@ -206,8 +224,18 @@ export default async function ItemsPage({
                       <Mono>{item.partNo}</Mono>
                     </Link>
                     <span>{item.description}</span>
-                    <span className="dax-sub">{item.brand.name}</span>
+                    <span className="dax-sub">
+                      {[item.brand.name, item.supplier?.name]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
                     <StockLine stock={item.stock} />
+                    {item.sellingPrice ? (
+                      <span className="dax-sub">
+                        Selling <b>{formatMoney(item.sellingPrice)}</b>
+                      </span>
+                    ) : null}
+                    <TagChips tags={item.tags} />
                     <ItemBadges item={item} />
                   </div>
                 </div>

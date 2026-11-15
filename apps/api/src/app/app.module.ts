@@ -19,6 +19,7 @@ export function authOptions(env: Env): AuthOptions {
   return {
     secret: env.BETTER_AUTH_SECRET,
     origins: { web: env.WEB_ORIGIN, admin: env.ADMIN_ORIGIN },
+    labelOrigin: env.LABEL_ORIGIN,
     internalTokens: {
       web: env.INTERNAL_TOKEN_WEB,
       admin: env.INTERNAL_TOKEN_ADMIN,

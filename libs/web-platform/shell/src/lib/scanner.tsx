@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  Alert,
-  Box,
-  Button,
-  Group,
-  Loader,
-  Stack,
-  TextInput,
-} from '@mantine/core';
+import { Box, Button, Group, Loader, Stack, TextInput } from '@mantine/core';
 import {
   type FormEvent,
   type RefObject,
@@ -18,6 +10,15 @@ import {
   useSyncExternalStore,
 } from 'react';
 import type { BarcodeFormat } from 'barcode-detector/ponyfill';
+import {
+  isScanMuted,
+  playScanFeedback,
+  type ScanTone,
+  setScanMuted,
+  subscribeScanMuted,
+  unlockScanAudio,
+} from './scan-feedback';
+import { Icon } from './icon';
 
 export type ScannerStatus =
   | 'idle'
@@ -30,7 +31,9 @@ export type ScannerStatus =
   | 'error';
 
 interface Detector {
-  detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]>;
+  detect(
+    source: HTMLVideoElement,
+  ): Promise<{ rawValue: string; format?: string }[]>;
 }
 type CreateDetector = () => Detector;
 
@@ -59,7 +62,10 @@ const WANTED_FORMATS: BarcodeFormat[] = [
   'data_matrix',
 ];
 
-const REPEAT_MS = 2500;
+// A code held in view is read once. It counts again only after it has been
+// out of view this long, so "+1 per scan" works by moving the part away and
+// back, without a held part counting on every frame.
+const GONE_MS = 900;
 const FRAME_MS = 200;
 
 let ponyfill: Promise<CreateDetector> | null = null;
@@ -131,7 +137,8 @@ function usePageVisible(): boolean {
 
 export interface UseScannerOptions {
   enabled: boolean;
-  onDetect: (code: string) => void;
+  /** `format` is the symbology, e.g. ean_13, code_128, qr_code. */
+  onDetect: (code: string, format?: string) => void;
   /** Same-origin folder holding `<version>/zxing_reader.wasm`. */
   wasmBase?: string;
 }
@@ -152,7 +159,7 @@ export function useScanner({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const onDetectRef = useRef(onDetect);
-  const lastRef = useRef({ code: '', at: 0 });
+  const seenRef = useRef(new Map<string, number>());
   const [status, setStatus] = useState<ScannerStatus>('idle');
   const [torch, setTorch] = useState({ supported: false, on: false });
   const [attempt, setAttempt] = useState(0);
@@ -169,14 +176,19 @@ export function useScanner({
     let timer: number | undefined;
     let stream: MediaStream | null = null;
 
-    function report(raw: string) {
-      const code = raw.trim();
+    function report(found: { rawValue: string; format?: string }[]) {
       const now = Date.now();
-      const last = lastRef.current;
-      if (!code || (code === last.code && now - last.at < REPEAT_MS)) return;
-      lastRef.current = { code, at: now };
-      if ('vibrate' in navigator) navigator.vibrate(60);
-      onDetectRef.current(code);
+      const seen = seenRef.current;
+      for (const hit of found) {
+        const code = hit.rawValue.trim();
+        if (!code) continue;
+        const before = seen.get(code);
+        seen.set(code, now);
+        if (before === undefined || now - before > GONE_MS) {
+          onDetectRef.current(code, hit.format);
+        }
+      }
+      for (const [code, at] of seen) if (now - at > 10_000) seen.delete(code);
     }
 
     async function start() {
@@ -230,7 +242,7 @@ export function useScanner({
         if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
           try {
             const found = await detector.detect(video);
-            if (found[0]) report(found[0].rawValue);
+            report(found);
           } catch {
             // A frame can fail to decode while the camera adjusts.
           }
@@ -288,26 +300,113 @@ const STATUS_MESSAGES: Partial<Record<ScannerStatus, string>> = {
     'The camera could not start. Close other apps that use it and try again.',
 };
 
+/** What a screen's scan handler returns: the tone to play, or nothing. */
+export type ScanReply = ScanTone | void;
+
+function useScanMuted(): boolean {
+  return useSyncExternalStore(subscribeScanMuted, isScanMuted, () => false);
+}
+
 export function Scanner({
   onCode,
   busy = false,
   autoStart = true,
+  manualEntry = true,
+  compact = false,
+  fill = false,
+  target = 'any',
   wasmBase,
 }: {
-  onCode: (code: string) => void;
+  /**
+   * Called once per scan. Return (or resolve to) 'ok' or 'miss' to beep and
+   * flash. Scans that arrive while one is still being handled wait their turn.
+   */
+  onCode: (code: string, format?: string) => ScanReply | Promise<ScanReply>;
   busy?: boolean;
   autoStart?: boolean;
+  /** Show the "type or scan a code" box (for hand-held scanners). */
+  manualEntry?: boolean;
+  /** Small round buttons on the camera instead of a row of big ones. */
+  compact?: boolean;
+  /** Fill the parent (full-screen camera) instead of a 4:3 box. */
+  fill?: boolean;
+  /**
+   * Shapes the aiming frame: a square for QR codes, a wide strip with a laser
+   * for barcodes, or a box that fits both.
+   */
+  target?: 'any' | 'qr' | 'barcode';
   wasmBase?: string;
 }) {
   const [cameraOn, setCameraOn] = useState(autoStart);
   const [manual, setManual] = useState('');
+  const [working, setWorking] = useState(false);
+  const [flash, setFlash] = useState<{ tone: ScanTone; key: number } | null>(
+    null,
+  );
+  const muted = useScanMuted();
   const inputRef = useRef<HTMLInputElement>(null);
+  const onCodeRef = useRef(onCode);
+  const queue = useRef<{ code: string; format?: string }[]>([]);
+  const draining = useRef(false);
+  const alive = useRef(true);
+
+  useEffect(() => {
+    onCodeRef.current = onCode;
+  });
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      queue.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!flash) return;
+    const timer = window.setTimeout(() => setFlash(null), 450);
+    return () => window.clearTimeout(timer);
+  }, [flash]);
+
+  // One scan at a time, in the order they were read.
+  async function drain() {
+    if (draining.current) return;
+    draining.current = true;
+    setWorking(true);
+    try {
+      while (alive.current && queue.current.length > 0) {
+        const next = queue.current.shift() as { code: string; format?: string };
+        let tone: ScanReply;
+        try {
+          tone = await onCodeRef.current(next.code, next.format);
+        } catch {
+          tone = 'miss';
+        }
+        if (!alive.current) return;
+        if (tone) {
+          playScanFeedback(tone);
+          setFlash({ tone, key: Date.now() });
+        }
+      }
+    } finally {
+      draining.current = false;
+      if (alive.current) setWorking(false);
+    }
+  }
+
+  function enqueue(code: string, format?: string) {
+    if (queue.current.length >= 20) return;
+    queue.current.push({ code, format });
+    void drain();
+  }
+
   const { videoRef, status, torch, toggleTorch, restart } = useScanner({
     enabled: cameraOn,
-    onDetect: onCode,
+    onDetect: enqueue,
     wasmBase,
   });
   const failed = Boolean(STATUS_MESSAGES[status]);
+  const spinning = busy || working;
 
   useEffect(() => {
     if (window.matchMedia('(pointer: fine)').matches) inputRef.current?.focus();
@@ -317,101 +416,168 @@ export function Scanner({
     event.preventDefault();
     const code = manual.trim();
     if (!code) return;
-    onCode(code);
+    enqueue(code, 'typed');
     setManual('');
   }
 
+  // The camera box keeps its size whatever happens (starting, blocked, off),
+  // so nothing below it jumps; problems show inside the box.
+  const notice = !cameraOn
+    ? 'Camera is off.'
+    : failed
+      ? STATUS_MESSAGES[status]
+      : null;
   return (
-    <Stack gap="md">
-      {cameraOn && !failed ? (
-        <Box
-          pos="relative"
-          bg="black"
+    <Stack
+      gap="md"
+      onPointerDown={unlockScanAudio}
+      className={fill ? 'dax-scan-fill' : undefined}
+    >
+      <Box className="dax-scan-box" pos="relative" bg="black">
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          aria-label="Camera view"
           style={{
-            aspectRatio: '4 / 3',
-            borderRadius: 'var(--mantine-radius-md)',
-            overflow: 'hidden',
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            visibility: notice ? 'hidden' : 'visible',
           }}
-        >
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            aria-label="Camera view"
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-          <Box
-            pos="absolute"
+        />
+        {notice ? (
+          <div className="dax-scan-notice" role="status">
+            {notice}
+          </div>
+        ) : (
+          <div
+            key={target}
             aria-hidden
-            style={{
-              inset: '18%',
-              border: '3px solid rgba(255, 255, 255, 0.85)',
-              borderRadius: 'var(--mantine-radius-md)',
-              boxShadow: '0 0 0 100vmax rgba(0, 0, 0, 0.25)',
-            }}
+            className="dax-scan-frame"
+            data-target={target}
+            data-flash={flash?.tone}
+          >
+            <span className="dax-scan-laser" />
+            <span key={flash?.key ?? 0} className="dax-scan-hit" />
+          </div>
+        )}
+        {!notice && (status === 'starting' || spinning) ? (
+          <Loader
+            color="white"
+            pos="absolute"
+            top="50%"
+            left="50%"
+            style={{ transform: 'translate(-50%, -50%)' }}
           />
-          {status === 'starting' || busy ? (
-            <Loader
-              color="white"
-              pos="absolute"
-              top="50%"
-              left="50%"
-              style={{ transform: 'translate(-50%, -50%)' }}
-            />
-          ) : null}
-        </Box>
-      ) : null}
-      {cameraOn && failed ? (
-        <Alert color="orange">{STATUS_MESSAGES[status]}</Alert>
-      ) : null}
-      <Group grow>
-        {cameraOn && failed ? (
-          <Button size="lg" onClick={restart}>
-            Try again
-          </Button>
         ) : null}
-        <Button
-          size="lg"
-          variant={cameraOn ? 'default' : 'filled'}
-          onClick={() => setCameraOn((on) => !on)}
-        >
-          {cameraOn ? 'Stop camera' : 'Start camera'}
-        </Button>
-        {cameraOn && torch.supported ? (
+        {compact ? (
+          <div className="dax-scan-tools">
+            {cameraOn && failed ? (
+              <button
+                type="button"
+                onClick={restart}
+                aria-label="Try the camera again"
+              >
+                <Icon name="history" size={20} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-pressed={cameraOn}
+                aria-label={
+                  cameraOn ? 'Turn the camera off' : 'Turn the camera on'
+                }
+                onClick={() => setCameraOn((on) => !on)}
+              >
+                <Icon name="camera" size={20} />
+              </button>
+            )}
+            {cameraOn && torch.supported ? (
+              <button
+                type="button"
+                aria-pressed={torch.on}
+                aria-label={torch.on ? 'Light off' : 'Light on'}
+                onClick={() => void toggleTorch()}
+              >
+                <Icon name="bolt" size={20} />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              aria-pressed={!muted}
+              aria-label={muted ? 'Sound is off' : 'Sound is on'}
+              onClick={() => setScanMuted(!muted)}
+            >
+              <Icon name={muted ? 'mute' : 'volume'} size={20} />
+            </button>
+          </div>
+        ) : null}
+      </Box>
+      {compact ? null : (
+        <Group grow>
+          {cameraOn && failed ? (
+            <Button size="lg" onClick={restart}>
+              Try again
+            </Button>
+          ) : (
+            <Button
+              size="lg"
+              variant={cameraOn ? 'default' : 'filled'}
+              onClick={() => setCameraOn((on) => !on)}
+            >
+              {cameraOn ? 'Stop camera' : 'Start camera'}
+            </Button>
+          )}
+          {cameraOn && torch.supported ? (
+            <Button
+              size="lg"
+              variant="default"
+              onClick={() => void toggleTorch()}
+            >
+              {torch.on ? 'Light off' : 'Light on'}
+            </Button>
+          ) : null}
           <Button
             size="lg"
             variant="default"
-            onClick={() => void toggleTorch()}
+            aria-pressed={!muted}
+            onClick={() => setScanMuted(!muted)}
           >
-            {torch.on ? 'Light off' : 'Light on'}
-          </Button>
-        ) : null}
-      </Group>
-      <form onSubmit={submit}>
-        <Group align="flex-end" wrap="nowrap" gap="sm">
-          <TextInput
-            size="lg"
-            label="Type or scan a code"
-            description="Hand-held scanners type here and press Enter."
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            enterKeyHint="search"
-            ref={inputRef}
-            value={manual}
-            onChange={(e) => setManual(e.currentTarget.value)}
-            style={{ flex: 1 }}
-          />
-          <Button
-            type="submit"
-            size="lg"
-            loading={busy}
-            disabled={!manual.trim()}
-          >
-            Find
+            {muted ? 'Sound off' : 'Sound on'}
           </Button>
         </Group>
-      </form>
+      )}
+      {manualEntry ? (
+        <form onSubmit={submit}>
+          <Group align="flex-end" wrap="nowrap" gap="sm">
+            <TextInput
+              size="lg"
+              label="Type or scan a code"
+              description="Hand-held scanners type here and press Enter."
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              enterKeyHint="search"
+              ref={inputRef}
+              value={manual}
+              onChange={(e) => setManual(e.currentTarget.value)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              type="submit"
+              size="lg"
+              loading={spinning}
+              disabled={!manual.trim()}
+            >
+              Find
+            </Button>
+          </Group>
+        </form>
+      ) : null}
+      <span className="dax-sr" role="status" aria-live="polite">
+        {flash ? (flash.tone === 'ok' ? 'Found' : 'Not found') : ''}
+      </span>
     </Stack>
   );
 }

@@ -2,7 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { BrandInput, MachineModelInput } from '@dax/inventory-contract';
+import {
+  BrandInput,
+  MachineModelInput,
+  MachineTypeInput,
+} from '@dax/inventory-contract';
 import { failure, invalid } from '../../../../lib/action-errors';
 import type { ActionState } from '../../../../lib/action-state';
 import { nullable, text } from '../../../../lib/form-data';
@@ -10,7 +14,8 @@ import { api } from '../../../../lib/server';
 
 const CODES = {
   BRAND_EXISTS: 'A brand with this name already exists.',
-  MACHINE_MODEL_EXISTS: 'This machine model already exists.',
+  MODEL_EXISTS: 'This machine model already exists.',
+  TYPE_EXISTS: 'This machine type already exists.',
 };
 
 function saved(message: string): ActionState {
@@ -54,6 +59,43 @@ export async function updateBrand(
   return saved('Saved.');
 }
 
+export async function createMachineType(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const parsed = MachineTypeInput.safeParse({ name: text(form, 'name') });
+  if (!parsed.success) return invalid(parsed.error);
+  try {
+    await api.request('/inventory/machine-types', () => undefined, {
+      method: 'POST',
+      json: parsed.data,
+    });
+  } catch (error) {
+    return failure(error, 'Could not add the machine type.', CODES);
+  }
+  return saved(`Machine type ${parsed.data.name} added.`);
+}
+
+const TypeUpdate = z.object({ id: z.uuid(), input: MachineTypeInput });
+
+export async function updateMachineType(
+  _prev: ActionState,
+  payload: z.input<typeof TypeUpdate>,
+): Promise<ActionState> {
+  const parsed = TypeUpdate.safeParse(payload);
+  if (!parsed.success) return invalid(parsed.error);
+  try {
+    await api.request(
+      `/inventory/machine-types/${parsed.data.id}`,
+      () => undefined,
+      { method: 'PATCH', json: parsed.data.input },
+    );
+  } catch (error) {
+    return failure(error, 'Could not save the machine type.', CODES);
+  }
+  return saved('Saved.');
+}
+
 export async function createMachineModel(
   _prev: ActionState,
   form: FormData,
@@ -61,6 +103,7 @@ export async function createMachineModel(
   const parsed = MachineModelInput.safeParse({
     name: text(form, 'name'),
     brandId: nullable(text(form, 'brandId')),
+    machineTypeId: nullable(text(form, 'machineTypeId')),
   });
   if (!parsed.success) return invalid(parsed.error);
   try {

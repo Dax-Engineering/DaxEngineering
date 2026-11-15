@@ -40,8 +40,13 @@ export function sanitizeAuthBody(body: unknown): Record<string, unknown> {
   );
 }
 
-export function isSameOrigin(request: Request, origin: string): boolean {
-  if (request.headers.get('origin') !== origin) return false;
+export function isSameOrigin(
+  request: Request,
+  origins: string | readonly string[],
+): boolean {
+  const allowed = typeof origins === 'string' ? [origins] : origins;
+  const origin = request.headers.get('origin');
+  if (!origin || !allowed.includes(origin)) return false;
   const site = request.headers.get('sec-fetch-site');
   return site === null || site === 'same-origin';
 }
@@ -62,7 +67,7 @@ export function createAuthProxy(app: AppName) {
     if (!isAllowedAuthPath(request.method, path)) {
       return new Response(null, { status: 404, headers: noStore() });
     }
-    if (!isSameOrigin(request, config.publicOrigin)) {
+    if (!isSameOrigin(request, config.trustedOrigins)) {
       return new Response(null, { status: 403, headers: noStore() });
     }
     const body = await request.arrayBuffer();

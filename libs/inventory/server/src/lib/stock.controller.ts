@@ -4,7 +4,14 @@ import { pageMeta, pageWindow } from '@dax/contracts';
 import { Requires } from '@dax/platform-core';
 import { type Prisma, PrismaService } from '@dax/platform-db';
 import { parse } from './common';
-import { belowMinFilter, belowMinIds, itemSearch } from './item-queries';
+import {
+  belowMinFilter,
+  belowMinIds,
+  extrasFilter,
+  ITEM_EXTRAS_SELECT,
+  itemExtras,
+  itemSearch,
+} from './item-queries';
 import { MainStore } from './main-store.service';
 import { isBelowMin, qtyString, stockFigures } from './stock-math';
 
@@ -34,6 +41,7 @@ export class StockController {
         query.inStock === 'false' ? { balances: { none: inStock } } : {},
         itemSearch(query.q),
         belowMinFilter(query.belowMin, ids),
+        extrasFilter(query),
       ],
     };
     const findRows = this.prisma.item.findMany({
@@ -45,6 +53,7 @@ export class StockController {
         uom: true,
         minQty: true,
         brand: { select: { name: true } },
+        ...ITEM_EXTRAS_SELECT,
         balances: {
           where: { storeId },
           select: {
@@ -78,6 +87,7 @@ export class StockController {
             description: r.description,
             uom: r.uom,
           },
+          ...itemExtras(r),
           stock: figures,
           minQty: qtyString(r.minQty),
           belowMin: isBelowMin(onHand, r.minQty),

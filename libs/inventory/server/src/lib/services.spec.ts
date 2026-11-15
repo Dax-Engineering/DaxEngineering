@@ -128,6 +128,10 @@ describe('item rules', () => {
         minQty: '1.5',
         defaultBinId: null,
         machineModelIds: [],
+        supplierId: null,
+        tags: [],
+        preCostPrice: null,
+        sellingPrice: null,
       }),
     );
     expect(error).toBeInstanceOf(BadRequestException);

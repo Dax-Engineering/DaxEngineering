@@ -18,12 +18,13 @@ import {
   Pager,
   SectionCard,
 } from '@dax/web-shell';
+import { names, TagChips } from '../../../../components/item-extras';
 import { ListFilters } from '../../../../components/list-filters';
 import { BelowMinBadge, StockLine } from '../../../../components/stock';
-import { formatCount, formatQty } from '../../../../lib/format';
+import { formatCount, formatMoney, formatQty } from '../../../../lib/format';
 import { flatten, type SearchParams } from '../../../../lib/query';
 import { requirePermission } from '../../../../lib/server';
-import { getZones, listStock } from '../_lib/data';
+import { getZones, itemFilterSelects, listStock } from '../_lib/data';
 
 function Bins({ row }: { row: StockRow }) {
   if (row.bins.length === 0) return <span className="dax-muted">—</span>;
@@ -45,7 +46,11 @@ export default async function StockPage({
 }) {
   const caps = await requirePermission('inventory.stock.view');
   const query = flatten(await searchParams);
-  const [zones, page] = await Promise.all([getZones(), listStock(query)]);
+  const [zones, page, extraSelects] = await Promise.all([
+    getZones(),
+    listStock(query),
+    itemFilterSelects(),
+  ]);
   const canSeeItems = canDo(caps, 'inventory.item.view');
   const part = (row: StockRow) =>
     canSeeItems ? (
@@ -58,7 +63,13 @@ export default async function StockPage({
       </b>
     );
   const filtered = Boolean(
-    query['q'] || query['inStock'] || query['belowMin'] || query['zoneId'],
+    query['q'] ||
+    query['inStock'] ||
+    query['belowMin'] ||
+    query['zoneId'] ||
+    query['supplierId'] ||
+    query['machineTypeId'] ||
+    query['tag'],
   );
 
   return (
@@ -84,6 +95,7 @@ export default async function StockPage({
                   label: `${z.code} · ${z.name}`,
                 })),
               },
+              ...extraSelects,
             ]}
             toggles={[
               { name: 'inStock', label: 'In stock' },
@@ -109,11 +121,15 @@ export default async function StockPage({
                     <TableTh>Part number</TableTh>
                     <TableTh>Brand</TableTh>
                     <TableTh>Description</TableTh>
+                    <TableTh>Supplier</TableTh>
+                    <TableTh>Machine type</TableTh>
                     <TableTh ta="right">On hand</TableTh>
                     <TableTh ta="right">Held</TableTh>
                     <TableTh ta="right">Free</TableTh>
                     <TableTh ta="right">In receiving</TableTh>
                     <TableTh ta="right">Minimum</TableTh>
+                    <TableTh ta="right">Pre-cost</TableTh>
+                    <TableTh ta="right">Selling</TableTh>
                     <TableTh>Bins</TableTh>
                   </TableTr>
                 </TableThead>
@@ -122,7 +138,12 @@ export default async function StockPage({
                     <TableTr key={row.item.id}>
                       <TableTd>{part(row)}</TableTd>
                       <TableTd>{row.item.brand}</TableTd>
-                      <TableTd>{row.item.description}</TableTd>
+                      <TableTd>
+                        {row.item.description}
+                        <TagChips tags={row.tags} />
+                      </TableTd>
+                      <TableTd>{row.supplier?.name ?? '—'}</TableTd>
+                      <TableTd>{names(row.machineTypes)}</TableTd>
                       <TableTd className="dax-num">
                         {formatQty(row.stock.onHand)}
                       </TableTd>
@@ -149,6 +170,12 @@ export default async function StockPage({
                           <BelowMinBadge belowMin={row.belowMin} />
                         </div>
                       </TableTd>
+                      <TableTd className="dax-num">
+                        {formatMoney(row.preCostPrice)}
+                      </TableTd>
+                      <TableTd className="dax-num">
+                        <b>{formatMoney(row.sellingPrice)}</b>
+                      </TableTd>
                       <TableTd>
                         <Bins row={row} />
                       </TableTd>
@@ -172,7 +199,24 @@ export default async function StockPage({
                       <span className="dax-sub">{row.item.brand}</span>
                     </div>
                     <span>{row.item.description}</span>
+                    {row.supplier || row.machineTypes.length ? (
+                      <span className="dax-sub">
+                        {[
+                          row.supplier?.name,
+                          ...row.machineTypes.map((t) => t.name),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    ) : null}
                     <StockLine stock={row.stock} />
+                    {row.preCostPrice || row.sellingPrice ? (
+                      <span className="dax-sub">
+                        Pre-cost {formatMoney(row.preCostPrice)} · Selling{' '}
+                        <b>{formatMoney(row.sellingPrice)}</b>
+                      </span>
+                    ) : null}
+                    <TagChips tags={row.tags} />
                     <span className="dax-sub">
                       Minimum {formatQty(row.minQty)} {row.item.uom}
                     </span>

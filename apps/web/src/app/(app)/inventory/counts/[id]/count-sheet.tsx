@@ -10,15 +10,16 @@ import {
   TextInput,
   UnstyledButton,
 } from '@mantine/core';
-import {
-  startTransition,
-  useActionState,
-  useRef,
-  useState,
-  useTransition,
-} from 'react';
+import { startTransition, useActionState, useState } from 'react';
 import type { CountBinDto, CountDto } from '@dax/inventory-contract';
-import { Icon, Mono, Pill, Scanner, SectionCard } from '@dax/web-shell';
+import {
+  Icon,
+  Mono,
+  Pill,
+  type ScanReply,
+  Scanner,
+  SectionCard,
+} from '@dax/web-shell';
 import { ConfirmAction } from '../../../../../components/confirm-action';
 import { StateAlert } from '../../../../../components/state-alert';
 import { IDLE } from '../../../../../lib/action-state';
@@ -50,36 +51,26 @@ function BinScan({
 }) {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startLookup] = useTransition();
-  const busy = useRef(false);
-
-  function handle(code: string) {
-    if (busy.current) return;
-    busy.current = true;
-    startLookup(async () => {
-      try {
-        const result = await lookupBin(code);
-        if (result.type === 'bin') {
-          if (bins.some((b) => b.id === result.bin.id)) {
-            setError(null);
-            setScanning(false);
-            onPick(result.bin.id);
-          } else {
-            setError(`Bin ${result.bin.code} is not part of this count.`);
-          }
-        } else if (result.type === 'none') {
-          setError('No bin matches that label.');
-        } else setError(result.message);
-      } finally {
-        busy.current = false;
+  async function handle(code: string): Promise<ScanReply> {
+    const result = await lookupBin(code);
+    if (result.type === 'bin') {
+      if (bins.some((b) => b.id === result.bin.id)) {
+        setError(null);
+        setScanning(false);
+        onPick(result.bin.id);
+        return 'ok';
       }
-    });
+      setError(`Bin ${result.bin.code} is not part of this count.`);
+    } else if (result.type === 'none') {
+      setError('No bin matches that label.');
+    } else setError(result.message);
+    return 'miss';
   }
 
   return (
     <Stack gap="sm">
       {scanning ? (
-        <Scanner onCode={handle} busy={pending} />
+        <Scanner onCode={handle} />
       ) : (
         <Button
           size="lg"

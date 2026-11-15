@@ -1,6 +1,7 @@
-import { PageHead, SectionCard } from '@dax/web-shell';
+import { canDo, PageHead, SectionCard } from '@dax/web-shell';
 import { flatten, type SearchParams } from '../../../lib/query';
 import { requirePermission } from '../../../lib/server';
+import { PhonesOnly } from './phones-only';
 import { ScanClient } from './scan-client';
 
 const NOTICES: Record<string, string> = {
@@ -13,7 +14,11 @@ export default async function ScanPage({
 }: {
   searchParams: SearchParams;
 }) {
-  await requirePermission('inventory.item.view', 'inventory.location.view');
+  const caps = await requirePermission(
+    'inventory.item.view',
+    'inventory.location.view',
+  );
+  const canPhone = canDo(caps, 'inventory.item.view');
   const { qr } = flatten(await searchParams);
   return (
     <>
@@ -22,9 +27,12 @@ export default async function ScanPage({
         title="Scan"
         lede="Point the camera at a label or barcode. You can also type the code, or use a hand-held scanner."
       />
-      <SectionCard>
-        <ScanClient notice={qr ? (NOTICES[qr] ?? null) : null} />
-      </SectionCard>
+      {/* PCs scan by lending a phone; the camera scanner is for phones. */}
+      <PhonesOnly pcPath={canPhone ? '/scan/phone' : null}>
+        <SectionCard>
+          <ScanClient notice={qr ? (NOTICES[qr] ?? null) : null} />
+        </SectionCard>
+      </PhonesOnly>
     </>
   );
 }

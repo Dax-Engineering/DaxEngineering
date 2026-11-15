@@ -35,6 +35,8 @@ export interface BootstrapAdmin {
 export interface AuthOptions {
   secret: string;
   origins: Record<AppName, string>;
+  /** Address printed in label QR codes; defaults to the web origin. */
+  labelOrigin?: string;
   internalTokens: Record<AppName, string>;
   production: boolean;
   resend?: { apiKey: string; from: string };

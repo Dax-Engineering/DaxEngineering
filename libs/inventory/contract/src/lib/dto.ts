@@ -64,10 +64,42 @@ export const BrandInput = z.strictObject({
 });
 export type BrandInput = z.infer<typeof BrandInput>;
 
+export const MachineTypeDto = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  active: z.boolean(),
+  modelCount: z.int(),
+});
+export type MachineTypeDto = z.infer<typeof MachineTypeDto>;
+export const MachineTypeInput = z.strictObject({
+  name: z.string().trim().min(1).max(60),
+  active: z.boolean().default(true),
+});
+export type MachineTypeInput = z.infer<typeof MachineTypeInput>;
+
+/** A money amount in rupees, up to 2 decimals. */
+export const Price = z
+  .string()
+  .trim()
+  .regex(/^\d{1,12}(\.\d{1,2})?$/, 'Enter an amount like 1250 or 1250.50');
+/** Short free-text label; stored lower-case. */
+export const Tag = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(1)
+  .max(30)
+  .regex(
+    /^[a-z0-9][a-z0-9 &/.-]*$/,
+    'Letters, digits, spaces and - & / . only',
+  );
+export const MAX_TAGS = 20;
+
 export const MachineModelDto = z.object({
   id: z.uuid(),
   name: z.string(),
   brand: Ref.nullable(),
+  machineType: Ref.nullable(),
   active: z.boolean(),
   itemCount: z.int(),
 });
@@ -75,12 +107,14 @@ export type MachineModelDto = z.infer<typeof MachineModelDto>;
 export const MachineModelInput = z.strictObject({
   name: z.string().trim().min(1).max(80),
   brandId: z.uuid().nullable().default(null),
+  machineTypeId: z.uuid().nullable().default(null),
   active: z.boolean().default(true),
 });
 export type MachineModelInput = z.infer<typeof MachineModelInput>;
 export const CatalogLists = z.object({
   brands: z.array(BrandDto),
   machineModels: z.array(MachineModelDto),
+  machineTypes: z.array(MachineTypeDto),
 });
 export type CatalogLists = z.infer<typeof CatalogLists>;
 
@@ -104,6 +138,12 @@ export const ItemSummary = z.object({
   minQty: z.string(),
   stock: StockFigures,
   belowMin: z.boolean(),
+  supplier: Ref.nullable(),
+  tags: z.array(z.string()),
+  /** From the machine models the item fits. */
+  machineTypes: z.array(Ref),
+  preCostPrice: z.string().nullable(),
+  sellingPrice: z.string().nullable(),
 });
 export type ItemSummary = z.infer<typeof ItemSummary>;
 export const ItemPage = pageOf(ItemSummary);
@@ -138,12 +178,20 @@ const itemFields = {
   defaultBinId: z.uuid().nullable(),
   machineModelIds: z.array(z.uuid()).max(50),
   notes: OptionalText(1000),
+  supplierId: z.uuid().nullable(),
+  tags: z.array(Tag).max(MAX_TAGS),
+  preCostPrice: Price.nullable(),
+  sellingPrice: Price.nullable(),
 };
 export const ItemInput = z.strictObject({
   ...itemFields,
   minQty: itemFields.minQty.default('0'),
   defaultBinId: itemFields.defaultBinId.default(null),
   machineModelIds: itemFields.machineModelIds.default([]),
+  supplierId: itemFields.supplierId.default(null),
+  tags: itemFields.tags.default([]),
+  preCostPrice: itemFields.preCostPrice.default(null),
+  sellingPrice: itemFields.sellingPrice.default(null),
 });
 export type ItemInput = z.infer<typeof ItemInput>;
 export const ItemUpdate = z
@@ -165,14 +213,28 @@ export const BarcodeInput = z.strictObject({
     .trim()
     .min(3)
     .max(64)
-    .regex(/^[\x21-\x7e]+$/, 'Printable characters only'),
+    // Plain characters; spaces are fine between them (e.g. "P31667701 AA").
+    .regex(
+      /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/,
+      'Letters, digits and symbols only; spaces only between characters',
+    ),
   kind: z.enum(BARCODE_KINDS),
 });
 export type BarcodeInput = z.infer<typeof BarcodeInput>;
 
+/** Suppliers and tags in use on items, for filters. */
+export const ItemFacets = z.object({
+  suppliers: z.array(Ref),
+  tags: z.array(z.string()),
+});
+export type ItemFacets = z.infer<typeof ItemFacets>;
+
 export const ItemQuery = PageQuery.extend({
   brandId: z.uuid().optional(),
   machineModelId: z.uuid().optional(),
+  machineTypeId: z.uuid().optional(),
+  supplierId: z.uuid().optional(),
+  tag: Tag.optional(),
   status: z.enum(['ACTIVE', 'ARCHIVED', 'ALL']).default('ACTIVE'),
   belowMin: z.enum(['true', 'false']).optional(),
 });
@@ -205,7 +267,7 @@ export type ZoneInput = z.infer<typeof ZoneInput>;
 export const BinDto = z.object({
   id: z.uuid(),
   code: z.string(),
-  zone: z.object({ id: z.uuid(), code: z.string() }),
+  zone: z.object({ id: z.uuid(), code: z.string(), name: z.string() }),
   rack: z.string(),
   shelf: z.string(),
   position: z.string(),
@@ -293,6 +355,11 @@ export const BinBulkResult = z.object({
 
 export const StockRow = z.object({
   item: ItemRef.extend({ description: z.string(), uom: z.string() }),
+  supplier: Ref.nullable(),
+  tags: z.array(z.string()),
+  machineTypes: z.array(Ref),
+  preCostPrice: z.string().nullable(),
+  sellingPrice: z.string().nullable(),
   stock: StockFigures,
   minQty: z.string(),
   belowMin: z.boolean(),
@@ -303,6 +370,9 @@ export const StockPage = pageOf(StockRow);
 export type StockPage = z.infer<typeof StockPage>;
 export const StockQuery = PageQuery.extend({
   zoneId: z.uuid().optional(),
+  supplierId: z.uuid().optional(),
+  machineTypeId: z.uuid().optional(),
+  tag: Tag.optional(),
   belowMin: z.enum(['true', 'false']).optional(),
   inStock: z.enum(['true', 'false']).optional(),
 });
@@ -344,6 +414,10 @@ export const ITEM_CSV_COLUMNS = [
   'machine_models',
   'barcodes',
   'notes',
+  'supplier',
+  'tags',
+  'pre_cost_price',
+  'selling_price',
 ] as const;
 
 export const BrandUpdate = z
@@ -353,10 +427,18 @@ export const BrandUpdate = z
   })
   .partial();
 export type BrandUpdate = z.infer<typeof BrandUpdate>;
+export const MachineTypeUpdate = z
+  .strictObject({
+    name: z.string().trim().min(1).max(60),
+    active: z.boolean(),
+  })
+  .partial();
+export type MachineTypeUpdate = z.infer<typeof MachineTypeUpdate>;
 export const MachineModelUpdate = z
   .strictObject({
     name: z.string().trim().min(1).max(80),
     brandId: z.uuid().nullable(),
+    machineTypeId: z.uuid().nullable(),
     active: z.boolean(),
   })
   .partial();
