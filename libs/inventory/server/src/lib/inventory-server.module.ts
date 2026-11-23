@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { BundlesController } from './bundles/bundles.controller';
+import { BundlesService } from './bundles/bundles.service';
 import { CatalogController } from './catalog.controller';
 import { AodsController } from './issuing/aods.controller';
 import { AodsService } from './issuing/aods.service';
@@ -15,6 +17,8 @@ import { ItemsService } from './items.service';
 import { LabelsController } from './labels.controller';
 import { LocationsController } from './locations.controller';
 import { LocationsService } from './locations.service';
+import { LowStockController } from './low-stock/low-stock.controller';
+import { LowStockSettingsService } from './low-stock/low-stock-settings.service';
 import { MainStore } from './main-store.service';
 import { DiscrepanciesController } from './receiving/discrepancies.controller';
 import { DiscrepanciesService } from './receiving/discrepancies.service';
@@ -31,6 +35,10 @@ import { CountsController } from './counts/counts.controller';
 import { CountsService } from './counts/counts.service';
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
+import { SerialsController } from './receiving/serials.controller';
+import { SerialsService } from './receiving/serials.service';
+import { StockAgeController } from './reports/stock-age.controller';
+import { StockAgeService } from './reports/stock-age.service';
 import { ReturnsController } from './returns/returns.controller';
 import { ReturnsService } from './returns/returns.service';
 import { WarrantyController } from './warranty/warranty.controller';
@@ -47,6 +55,7 @@ import { SummaryController } from './summary.controller';
 @Module({
   controllers: [
     CatalogController,
+    BundlesController,
     ItemsController,
     LocationsController,
     StockController,
@@ -67,9 +76,13 @@ import { SummaryController } from './summary.controller';
     CountsController,
     WarrantyController,
     ReportsController,
+    StockAgeController,
+    SerialsController,
+    LowStockController,
   ],
   providers: [
     MainStore,
+    BundlesService,
     ItemsService,
     LocationsService,
     ScanService,
@@ -87,6 +100,9 @@ import { SummaryController } from './summary.controller';
     CountsService,
     WarrantyService,
     ReportsService,
+    StockAgeService,
+    SerialsService,
+    LowStockSettingsService,
     { provide: MRN_RELEASE_GATES, useValue: [] },
   ],
   exports: [

@@ -26,7 +26,7 @@ import { uuidParam } from '../../../../../../lib/load';
 import { requirePermission } from '../../../../../../lib/server';
 import { qtyNumber } from '../../../receiving/_lib/lines';
 import { mrnStep } from '../../_lib/actions';
-import { getDepartments, getMrn } from '../../_lib/data';
+import { getDepartments, getMrn, getSavedBundles } from '../../_lib/data';
 import {
   AOD_TYPE_LABELS,
   aodPath,
@@ -36,6 +36,12 @@ import {
   PICKABLE_MRN,
 } from '../../_lib/labels';
 import { AodStatusPill, MrnStatusPill, WaitingPill } from '../../_lib/pills';
+import {
+  type BundleRef,
+  BundleTitle,
+  groupByBundle,
+  setsText,
+} from '../../_lib/bundle-groups';
 import { MrnForm } from '../mrn-form';
 import {
   AllocateButton,
@@ -53,11 +59,42 @@ function Bins({ line }: { line: MrnLineDto }) {
   return (
     <span className="dax-chips" style={{ gap: 4 }}>
       {line.bins.map((b) => (
-        <span key={b.id} className="dax-pill">
+        <span key={`${b.id}-${b.itemId}`} className="dax-pill">
           <Mono>{b.code}</Mono> {formatQty(b.qty)}
+          {b.itemId !== line.item.id ? (
+            <>
+              {' '}
+              of <Mono>{b.partNo}</Mono>
+            </>
+          ) : null}
         </span>
       ))}
     </span>
+  );
+}
+
+/** Notes for a line whose part has superseded numbers: the current number, and where its stock is reserved. */
+function FamilyNotes({ line }: { line: MrnLineDto }) {
+  const fromOthers = line.reservedBy.some((r) => r.item.id !== line.item.id);
+  return (
+    <>
+      {line.supersededBy ? (
+        <span className="dax-sub">
+          Superseded by <Mono>{line.supersededBy.partNo}</Mono>
+        </span>
+      ) : null}
+      {fromOthers ? (
+        <span className="dax-sub">
+          Reserved{' '}
+          {line.reservedBy.map((r, i) => (
+            <span key={r.item.id}>
+              {i > 0 ? ' · ' : ''}
+              {formatQty(r.qty)} of <Mono>{r.item.partNo}</Mono>
+            </span>
+          ))}
+        </span>
+      ) : null}
+    </>
   );
 }
 
@@ -69,7 +106,25 @@ function Qty({ value }: { value: string }) {
   );
 }
 
+function bundleNote(b: MrnDto['bundles'][number]): string {
+  if (b.setsIssued >= b.qtySets) return `${setsText(b.qtySets)} · all issued`;
+  const issued = b.setsIssued ? ` · ${b.setsIssued} issued` : '';
+  return `${setsText(b.qtySets)} · ${b.setsReady} of ${b.qtySets - b.setsIssued} ready${issued}`;
+}
+
 function Lines({ mrn }: { mrn: MrnDto }) {
+  const groups = groupByBundle(mrn.lines, mrn.bundles);
+  const sets = new Map(mrn.bundles.map((b) => [b.id, b]));
+  const head = (b: BundleRef) => {
+    const info = sets.get(b.id);
+    return info ? (
+      <BundleTitle bundle={b}>
+        <span className="dax-muted">{bundleNote(info)}</span>
+      </BundleTitle>
+    ) : (
+      <BundleTitle bundle={b} />
+    );
+  };
   return (
     <>
       <Box visibleFrom="md">
@@ -87,79 +142,114 @@ function Lines({ mrn }: { mrn: MrnDto }) {
             </TableTr>
           </TableThead>
           <TableTbody>
-            {mrn.lines.map((l) => (
-              <TableTr key={l.id}>
-                <TableTd>
-                  <Link
-                    href={`/inventory/items/${l.item.id}`}
-                    className="dax-link"
-                  >
-                    <Mono>{l.item.partNo}</Mono>
-                  </Link>
-                  <span className="dax-sub">{l.item.description}</span>
-                  {l.notes ? <span className="dax-sub">{l.notes}</span> : null}
-                </TableTd>
-                <TableTd className="dax-num">
-                  {formatQty(l.qtyRequested)}{' '}
-                  <span className="dax-muted">{l.item.uom}</span>
-                </TableTd>
-                <TableTd className="dax-num">
-                  <Qty value={l.qtyReserved} />
-                </TableTd>
-                <TableTd className="dax-num">
-                  <Qty value={l.qtyIssued} />
-                </TableTd>
-                <TableTd className="dax-num">
-                  {qtyNumber(l.qtyWaiting) > 0 ? (
-                    <Pill tone="hi">{formatQty(l.qtyWaiting)}</Pill>
-                  ) : (
-                    <span className="dax-muted">—</span>
-                  )}
-                </TableTd>
-                <TableTd className="dax-num">
-                  <Qty value={l.qtyShortClosed} />
-                </TableTd>
-                <TableTd className="dax-num">{formatQty(l.freeNow)}</TableTd>
-                <TableTd>
-                  <Bins line={l} />
-                </TableTd>
-              </TableTr>
-            ))}
+            {groups.flatMap((g) => [
+              ...(g.bundle
+                ? [
+                    <TableTr key={`b-${g.bundle.id}`}>
+                      <TableTd colSpan={8} className="dax-bundle-cell">
+                        <span className="dax-chips">{head(g.bundle)}</span>
+                      </TableTd>
+                    </TableTr>,
+                  ]
+                : []),
+              ...g.lines.map((l) => (
+                <TableTr
+                  key={l.id}
+                  className={g.bundle ? 'dax-bundle-part' : undefined}
+                >
+                  <TableTd>
+                    <Link
+                      href={`/inventory/items/${l.item.id}`}
+                      className="dax-link"
+                    >
+                      <Mono>{l.item.partNo}</Mono>
+                    </Link>
+                    <span className="dax-sub">{l.item.description}</span>
+                    <FamilyNotes line={l} />
+                    {l.notes ? (
+                      <span className="dax-sub">{l.notes}</span>
+                    ) : null}
+                  </TableTd>
+                  <TableTd className="dax-num">
+                    {formatQty(l.qtyRequested)}{' '}
+                    <span className="dax-muted">{l.item.uom}</span>
+                    {l.qtyPerSet ? (
+                      <span className="dax-sub">
+                        {formatQty(l.qtyPerSet)} per set
+                      </span>
+                    ) : null}
+                  </TableTd>
+                  <TableTd className="dax-num">
+                    <Qty value={l.qtyReserved} />
+                  </TableTd>
+                  <TableTd className="dax-num">
+                    <Qty value={l.qtyIssued} />
+                  </TableTd>
+                  <TableTd className="dax-num">
+                    {qtyNumber(l.qtyWaiting) > 0 ? (
+                      <Pill tone="hi">{formatQty(l.qtyWaiting)}</Pill>
+                    ) : (
+                      <span className="dax-muted">—</span>
+                    )}
+                  </TableTd>
+                  <TableTd className="dax-num">
+                    <Qty value={l.qtyShortClosed} />
+                  </TableTd>
+                  <TableTd className="dax-num">{formatQty(l.freeNow)}</TableTd>
+                  <TableTd>
+                    <Bins line={l} />
+                  </TableTd>
+                </TableTr>
+              )),
+            ])}
           </TableTbody>
         </Table>
       </Box>
       <Box hiddenFrom="md" className="dax-rows">
-        {mrn.lines.map((l) => (
-          <div key={l.id} className="dax-row">
-            <div className="dax-row-main">
-              <Link
-                href={`/inventory/items/${l.item.id}`}
-                className="dax-link"
-                style={{ fontSize: 17 }}
-              >
-                <Mono>{l.item.partNo}</Mono>
-              </Link>
-              <span>{l.item.description}</span>
-              <span className="dax-sub">
-                Requested <b>{formatQty(l.qtyRequested)}</b> · Reserved{' '}
-                <b>{formatQty(l.qtyReserved)}</b> · Issued{' '}
-                <b>{formatQty(l.qtyIssued)}</b> {l.item.uom}
-              </span>
-              <span className="dax-sub">
-                Free now {formatQty(l.freeNow)}
-                {qtyNumber(l.qtyShortClosed) > 0
-                  ? ` · Short-closed ${formatQty(l.qtyShortClosed)}`
-                  : ''}
-              </span>
-              {qtyNumber(l.qtyWaiting) > 0 ? (
-                <span>
-                  <Pill tone="hi">Waiting {formatQty(l.qtyWaiting)}</Pill>
+        {groups.flatMap((g) => [
+          ...(g.bundle
+            ? [
+                <div key={`b-${g.bundle.id}`} className="dax-bundle-head">
+                  {head(g.bundle)}
+                </div>,
+              ]
+            : []),
+          ...g.lines.map((l) => (
+            <div
+              key={l.id}
+              className={g.bundle ? 'dax-row dax-bundle-part' : 'dax-row'}
+            >
+              <div className="dax-row-main">
+                <Link
+                  href={`/inventory/items/${l.item.id}`}
+                  className="dax-link"
+                  style={{ fontSize: 17 }}
+                >
+                  <Mono>{l.item.partNo}</Mono>
+                </Link>
+                <span>{l.item.description}</span>
+                <FamilyNotes line={l} />
+                <span className="dax-sub">
+                  Requested <b>{formatQty(l.qtyRequested)}</b> · Reserved{' '}
+                  <b>{formatQty(l.qtyReserved)}</b> · Issued{' '}
+                  <b>{formatQty(l.qtyIssued)}</b> {l.item.uom}
                 </span>
-              ) : null}
-              <Bins line={l} />
+                <span className="dax-sub">
+                  Free now {formatQty(l.freeNow)}
+                  {qtyNumber(l.qtyShortClosed) > 0
+                    ? ` · Short-closed ${formatQty(l.qtyShortClosed)}`
+                    : ''}
+                </span>
+                {qtyNumber(l.qtyWaiting) > 0 ? (
+                  <span>
+                    <Pill tone="hi">Waiting {formatQty(l.qtyWaiting)}</Pill>
+                  </span>
+                ) : null}
+                <Bins line={l} />
+              </div>
             </div>
-          </div>
-        ))}
+          )),
+        ])}
       </Box>
     </>
   );
@@ -177,11 +267,24 @@ export default async function MrnPage({
   const draft = mrn.status === 'DRAFT';
   const canEdit = draft && can('inventory.mrn.create');
   const departments = canEdit ? await getDepartments() : [];
+  const savedBundles =
+    canEdit && can('inventory.bundle.view') ? await getSavedBundles() : [];
   const pickable = PICKABLE_MRN.includes(mrn.status);
   const reserved = mrn.lines.some((l) => qtyNumber(l.qtyReserved) > 0);
   const waiting = mrn.lines.some((l) => qtyNumber(l.qtyWaiting) > 0);
   const nothingIssued = mrn.lines.every((l) => qtyNumber(l.qtyIssued) === 0);
-  const picking = mrn.aods.find((a) => a.status === 'PICKING');
+  const picking = mrn.aods.find(
+    (a) =>
+      a.status === 'PICKING' ||
+      a.status === 'PENDING_APPROVAL' ||
+      a.status === 'APPROVED',
+  );
+  const openAodLabel =
+    picking?.status === 'PENDING_APPROVAL'
+      ? 'AOD awaiting approval'
+      : picking?.status === 'APPROVED'
+        ? 'Issue approved AOD'
+        : 'Continue AOD';
   const cancellable =
     can('inventory.mrn.cancel') &&
     nothingIssued &&
@@ -194,14 +297,14 @@ export default async function MrnPage({
   return (
     <>
       <PageHead
-        back={{ href: `${BASE}/mrns`, label: 'Requests' }}
+        back={{ href: `${BASE}/mrns`, label: 'MRNs' }}
         eyebrow={
           <>
-            {MRN_SUBTYPE_LABELS[mrn.subtype]} request · Created{' '}
+            {MRN_SUBTYPE_LABELS[mrn.subtype]} MRN · Created{' '}
             {formatDateTime(mrn.createdAt)}
           </>
         }
-        title={mrn.number ? <Mono>{mrn.number}</Mono> : 'Draft request'}
+        title={mrn.number ? <Mono>{mrn.number}</Mono> : 'Draft MRN'}
         lede={who}
         actions={
           <>
@@ -210,9 +313,9 @@ export default async function MrnPage({
                 action={mrnStep}
                 payload={{ id: mrn.id, version: mrn.version, step: 'cancel' }}
                 label="Cancel"
-                title="Cancel this request?"
+                title="Cancel this MRN?"
                 message="Anything reserved for it becomes free again."
-                confirmLabel="Cancel request"
+                confirmLabel="Cancel MRN"
                 color="red"
               />
             ) : null}
@@ -227,15 +330,13 @@ export default async function MrnPage({
                 action={mrnStep}
                 payload={{ id: mrn.id, version: mrn.version, step: 'check' }}
                 label="Check and reserve"
-                title="Check this request?"
+                title="Check this MRN?"
                 message="Free stock is reserved for each line now. Anything not free waits until the Stores Manager assigns new stock."
                 confirmLabel="Check and reserve"
               />
             ) : null}
             {picking && can('inventory.aod.view') ? (
-              <LinkButton href={aodPath(picking.id)}>
-                Continue picking
-              </LinkButton>
+              <LinkButton href={aodPath(picking.id)}>{openAodLabel}</LinkButton>
             ) : pickable && reserved && can('inventory.aod.issue') ? (
               <StartPickingButton mrn={mrn} />
             ) : null}
@@ -301,19 +402,20 @@ export default async function MrnPage({
             mrn={mrn}
             departments={departments}
             canSubmit
+            savedBundles={savedBundles}
           />
         </SectionCard>
       ) : (
         <SectionCard
           flush
           title="Parts"
-          note={`${mrn.lines.length} ${mrn.lines.length === 1 ? 'line' : 'lines'}`}
+          note={`${mrn.lines.length} ${mrn.lines.length === 1 ? 'line' : 'lines'}${mrn.bundles.length ? ` · ${mrn.bundles.length} ${mrn.bundles.length === 1 ? 'bundle' : 'bundles'}` : ''}`}
         >
           <Lines mrn={mrn} />
         </SectionCard>
       )}
 
-      <SectionCard title="Dispatch notes" note="AODs for this request">
+      <SectionCard title="AODs" note="AODs for this MRN">
         {mrn.aods.length ? (
           <LinkList
             items={mrn.aods.map((a) => ({

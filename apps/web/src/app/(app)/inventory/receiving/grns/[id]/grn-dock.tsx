@@ -267,7 +267,7 @@ export function GrnDock({ grn, canPost }: { grn: GrnDto; canPost: boolean }) {
 
   return (
     <Stack gap="lg">
-      <SectionCard title="Delivery">
+      <SectionCard title="GRN details">
         <Stack>
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <TextInput

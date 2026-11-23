@@ -82,6 +82,18 @@ export default async function IssuingPage({
           href: aodLink('PICKING'),
         },
         {
+          label: 'Awaiting approval',
+          value: count.format(summary.awaitingApproval),
+          tone: 'yel',
+          href: aodLink('PENDING_APPROVAL'),
+        },
+        {
+          label: 'Approved, to issue',
+          value: count.format(summary.approved),
+          tone: 'int',
+          href: aodLink('APPROVED'),
+        },
+        {
           label: 'Awaiting signature',
           value: count.format(summary.awaitingSignature),
           tone: 'bad',
@@ -94,7 +106,7 @@ export default async function IssuingPage({
   if (can('inventory.mrn.create'))
     tiles.push({
       href: `${BASE}/mrns/new`,
-      title: 'New request',
+      title: 'Raise MRN',
       sub: 'Parts a job or department needs.',
       icon: 'plus',
       use: 'often',
@@ -102,7 +114,7 @@ export default async function IssuingPage({
   if (can('inventory.aod.issue'))
     tiles.push({
       href: `${BASE}/mrns?status=READY`,
-      title: 'Pick and issue',
+      title: 'Pick and issue AOD',
       sub: summary
         ? `${count.format(summary.mrnReady)} ready. Pick parts and print the AOD.`
         : 'Pick reserved parts and print the AOD.',
@@ -114,9 +126,19 @@ export default async function IssuingPage({
       href: `${BASE}/mrns?status=WAITING`,
       title: 'Waiting for stock',
       sub: summary
-        ? `${count.format(summary.mrnWaiting)} requests waiting for stock.`
-        : 'Assign newly arrived stock to waiting requests.',
+        ? `${count.format(summary.mrnWaiting)} MRNs waiting for stock.`
+        : 'Assign newly arrived stock to waiting MRNs.',
       icon: 'history',
+      use: 'often',
+    });
+  if (can('inventory.aod.approve'))
+    tiles.push({
+      href: `${BASE}/aods?status=PENDING_APPROVAL`,
+      title: 'Approve AODs',
+      sub: summary
+        ? `${count.format(summary.awaitingApproval)} waiting for your approval before Stores issues them.`
+        : 'Approve or reject AODs before Stores issues and prints them.',
+      icon: 'check',
       use: 'often',
     });
   if (canAods)
@@ -145,7 +167,7 @@ export default async function IssuingPage({
       <PageHead
         eyebrow="Inventory"
         title="Issuing"
-        lede="Requests are checked and reserved, picked onto an AOD, issued, then completed with the signed copy."
+        lede="MRNs are checked and reserved, picked onto an AOD, approved, issued, then completed with the signed copy."
       />
       {kpis.length ? <KpiTiles items={kpis} /> : null}
       {tiles.length ? (
@@ -155,8 +177,8 @@ export default async function IssuingPage({
       ) : null}
       {mrns ? (
         <SectionCard
-          title="Requests"
-          note="Material requests (MRN)"
+          title="MRNs"
+          note="Material request notes"
           actions={
             <Link className="dax-link" href={`${BASE}/mrns`}>
               See all
@@ -200,7 +222,7 @@ export default async function IssuingPage({
               }))}
             />
           ) : (
-            <Empty title="No requests here">
+            <Empty title="No MRNs here">
               {status === 'OPEN'
                 ? 'Nothing is open right now.'
                 : 'Try another filter.'}

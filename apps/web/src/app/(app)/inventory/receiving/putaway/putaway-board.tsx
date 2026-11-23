@@ -34,6 +34,7 @@ import { grnPath } from '../_lib/labels';
 import { isQty, qtyNumber, qtyText, round3 } from '../_lib/lines';
 import { QtyStepper } from '../_lib/qty-stepper';
 import type { BinRef } from '../_lib/types';
+import { SerialLabelsButton } from '../../../../../components/serial-labels';
 
 export interface PutawayGroup {
   grn: { id: string; number: string };
@@ -363,11 +364,19 @@ export function PutawayBoard({
                   ) : (
                     <Pill>No usual bin</Pill>
                   )}
-                  {canAct ? (
-                    <Button size="md" onClick={() => setOpen(row)}>
-                      Put away
-                    </Button>
-                  ) : null}
+                  <Group gap="xs">
+                    <SerialLabelsButton
+                      scope={{ grnId: row.grn.id, grnLineId: row.grnLineId }}
+                      label="Print labels"
+                      unprintedOnly
+                      size="md"
+                    />
+                    {canAct ? (
+                      <Button size="md" onClick={() => setOpen(row)}>
+                        Put away
+                      </Button>
+                    ) : null}
+                  </Group>
                 </Group>
               </div>
             ))}

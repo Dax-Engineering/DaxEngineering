@@ -27,11 +27,11 @@ export const REPORTS = {
     view: 'inventory.stock.view',
     export: 'inventory.stock.export',
   },
-  'slow-moving': {
-    title: 'Slow-moving stock',
-    sub: 'Parts on the shelf that have not been issued for a while.',
-    icon: 'archive',
-    use: 'rarely',
+  'stock-age': {
+    title: 'Stock age',
+    sub: 'How long the stock on the shelf has been in the store, in age bands.',
+    icon: 'history',
+    use: 'sometimes',
     view: 'inventory.stock.view',
     export: 'inventory.stock.export',
   },

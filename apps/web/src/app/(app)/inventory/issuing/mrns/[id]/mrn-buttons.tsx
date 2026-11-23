@@ -74,7 +74,7 @@ export function AllocateButton({ mrn }: { mrn: MrnDto }) {
       <Modal
         opened={opened}
         onClose={() => setOpened(false)}
-        title="Assign stock to this request"
+        title="Assign stock to this MRN"
         size="lg"
         centered
       >
@@ -144,20 +144,20 @@ export function StartPickingButton({ mrn }: { mrn: MrnDto }) {
   const { opened, setOpened, state, run, pending } = useDialog(startPicking);
   return (
     <>
-      <Button onClick={() => setOpened(true)}>Start picking</Button>
+      <Button onClick={() => setOpened(true)}>Raise AOD</Button>
       <Modal
         opened={opened}
         onClose={() => setOpened(false)}
-        title="Start picking"
+        title="Raise AOD"
         centered
       >
         <Stack>
           <Text size="sm">
-            Creates a dispatch note (AOD) with every reserved part and its
-            suggested bin. Nothing leaves the store until it is issued.
+            Raises an AOD with every reserved part and its suggested bin.
+            Nothing leaves the store until it is issued.
           </Text>
           <Select
-            label="Dispatch type"
+            label="AOD type"
             data={AOD_TYPE_OPTIONS}
             value={type}
             onChange={(v) => {
@@ -204,7 +204,7 @@ export function StartPickingButton({ mrn }: { mrn: MrnDto }) {
                 run({ mrnId: mrn.id, type, deliverTo, vehicleNo, notes })
               }
             >
-              Start picking
+              Raise AOD
             </Button>
           </Group>
         </Stack>
@@ -224,13 +224,13 @@ export function ShortCloseButton({ mrn }: { mrn: MrnDto }) {
       <Modal
         opened={opened}
         onClose={() => setOpened(false)}
-        title="Short-close this request?"
+        title="Short-close this MRN?"
         centered
       >
         <Stack>
           <Text size="sm">
-            The waiting quantities are dropped and the request closes once what
-            is reserved has been issued.
+            The waiting quantities are dropped and the MRN closes once what is
+            reserved has been issued.
           </Text>
           <Textarea
             label="Reason"

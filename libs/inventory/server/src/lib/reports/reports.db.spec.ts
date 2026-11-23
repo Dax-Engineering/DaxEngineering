@@ -200,25 +200,4 @@ describe.skipIf(!url)('stores reports against Postgres', () => {
     const storage = await reports.stockByBin({ zoneId, kind: 'STORAGE' });
     expect(storage.bins.map((b) => b.id)).toEqual([storageBin]);
   });
-
-  it('counts a part never issued as slow-moving until it is issued', async () => {
-    const before = await reports.slowMoving({ days: '30' });
-    expect(before.items.find((r) => r.item.id === itemId)).toMatchObject({
-      onHand: '6',
-      lastIssuedAt: null,
-      daysSinceIssue: null,
-    });
-    await post([
-      {
-        itemId,
-        binId: storageBin,
-        qty: '-1',
-        movement: 'ISSUE',
-        docType: 'AOD',
-        docId: randomUUID(),
-      },
-    ]);
-    const after = await reports.slowMoving({ days: '30' });
-    expect(after.items.some((r) => r.item.id === itemId)).toBe(false);
-  });
 });

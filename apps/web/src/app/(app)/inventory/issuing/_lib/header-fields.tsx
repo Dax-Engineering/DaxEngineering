@@ -18,7 +18,7 @@ export function DepartmentSelect({
 }) {
   return (
     <Select
-      label="Requesting department"
+      label="Department"
       required
       data={departments.map((d) => ({ value: d.id, label: d.name }))}
       value={value}

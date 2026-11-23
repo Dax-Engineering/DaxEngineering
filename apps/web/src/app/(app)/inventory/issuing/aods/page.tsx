@@ -44,7 +44,7 @@ export default async function AodListPage({
       <PageHead
         back={{ href: BASE, label: 'Issuing' }}
         eyebrow="Issuing"
-        title="Dispatch notes"
+        title="AODs"
         lede="An AOD is complete only when its signed copy is uploaded."
       />
       <SectionCard
@@ -53,7 +53,7 @@ export default async function AodListPage({
         note={`${formatCount(page.total)} total`}
         toolbar={
           <ListFilters
-            searchPlaceholder="AOD or MRN number"
+            searchPlaceholder="AOD, MRN or customer part number"
             selects={[
               {
                 name: 'status',
@@ -63,6 +63,8 @@ export default async function AodListPage({
                 data: [
                   { value: 'OPEN', label: 'Open' },
                   { value: 'PICKING', label: 'Picking' },
+                  { value: 'PENDING_APPROVAL', label: 'Awaiting approval' },
+                  { value: 'APPROVED', label: 'Approved' },
                   { value: 'ISSUED', label: 'Awaiting signature' },
                   { value: 'SIGNED', label: 'Signed' },
                   { value: 'ALL', label: 'All' },
@@ -74,10 +76,10 @@ export default async function AodListPage({
       >
         {page.items.length === 0 ? (
           <CardBody>
-            <Empty title="No dispatch notes found">
+            <Empty title="No AODs found">
               {filtered
                 ? 'Try a different search or filter.'
-                : 'Start picking from a checked request.'}
+                : 'Raise an AOD from a checked MRN.'}
             </Empty>
           </CardBody>
         ) : (
@@ -88,7 +90,7 @@ export default async function AodListPage({
                   <TableTr>
                     <TableTh>AOD</TableTh>
                     <TableTh>Type</TableTh>
-                    <TableTh>Request</TableTh>
+                    <TableTh>MRN</TableTh>
                     <TableTh>For</TableTh>
                     <TableTh ta="right">Lines</TableTh>
                     <TableTh>Date</TableTh>

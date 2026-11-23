@@ -26,7 +26,15 @@ import {
   SelectionHint,
 } from '../../../../components/labels';
 import { LinkButton } from '../../../../components/links';
-import { TagChips } from '../../../../components/item-extras';
+import {
+  FamilyBar,
+  FamilyList,
+  FamilyMemberPart,
+  FamilyShare,
+  FamilyToggle,
+  inStock,
+  TagChips,
+} from '../../../../components/item-extras';
 import { ListFilters } from '../../../../components/list-filters';
 import { BelowMinBadge, StockLine } from '../../../../components/stock';
 import { formatCount, formatMoney, formatQty } from '../../../../lib/format';
@@ -37,7 +45,7 @@ import { getCatalog, itemFilterSelects, listItems } from '../_lib/data';
 function ItemBadges({ item }: { item: ItemSummary }) {
   return (
     <div className="dax-chips" style={{ gap: 4 }}>
-      {item.supersededBy ? <Pill tone="yel">Replaced</Pill> : null}
+      {item.supersededBy ? <Pill tone="yel">Superseded</Pill> : null}
       {item.status === 'ARCHIVED' ? <Pill>Archived</Pill> : null}
       <BelowMinBadge belowMin={item.belowMin} />
     </div>
@@ -168,9 +176,9 @@ export default async function ItemsPage({
                     <TableTh />
                   </TableTr>
                 </TableThead>
-                <TableTbody>
-                  {page.items.map((item) => (
-                    <TableTr key={item.id}>
+                {page.items.map((item) => (
+                  <TableTbody key={item.id}>
+                    <TableTr>
                       {canPrint ? (
                         <TableTd>
                           <SelectCheckbox id={item.id} label={item.partNo} />
@@ -183,6 +191,7 @@ export default async function ItemsPage({
                         >
                           <Mono>{item.partNo}</Mono>
                         </Link>
+                        <FamilyToggle family={inStock(item.family)} />
                       </TableTd>
                       <TableTd>{item.brand.name}</TableTd>
                       <TableTd>
@@ -192,6 +201,7 @@ export default async function ItemsPage({
                       <TableTd>{item.supplier?.name ?? '—'}</TableTd>
                       <TableTd className="dax-num">
                         {formatQty(item.stock.onHand)}
+                        <FamilyBar family={inStock(item.family)} />
                       </TableTd>
                       <TableTd className="dax-num">
                         {formatQty(item.stock.held)}
@@ -207,8 +217,41 @@ export default async function ItemsPage({
                         <ItemBadges item={item} />
                       </TableTd>
                     </TableTr>
-                  ))}
-                </TableTbody>
+                    {inStock(item.family).members.length > 1
+                      ? inStock(item.family).members.map((m) => (
+                          <TableTr key={m.id} className="dax-fam-sub">
+                            {canPrint ? <TableTd /> : null}
+                            <TableTd colSpan={4}>
+                              <FamilyMemberPart member={m} />
+                            </TableTd>
+                            <TableTd className="dax-num">
+                              {formatQty(m.onHand)}
+                              <FamilyShare
+                                member={m}
+                                family={inStock(item.family)}
+                              />
+                            </TableTd>
+                            <TableTd className="dax-num">
+                              {formatQty(m.held)}
+                            </TableTd>
+                            <TableTd className="dax-num">
+                              {formatQty(m.free)}
+                            </TableTd>
+                            <TableTd colSpan={2}>
+                              {m.id === item.id ? null : (
+                                <Link
+                                  href={`/inventory/items/${m.id}`}
+                                  className="dax-link"
+                                >
+                                  Open
+                                </Link>
+                              )}
+                            </TableTd>
+                          </TableTr>
+                        ))
+                      : null}
+                  </TableTbody>
+                ))}
               </Table>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
@@ -230,6 +273,8 @@ export default async function ItemsPage({
                         .join(' · ')}
                     </span>
                     <StockLine stock={item.stock} />
+                    <FamilyBar family={inStock(item.family)} />
+                    <FamilyList family={inStock(item.family)} />
                     {item.sellingPrice ? (
                       <span className="dax-sub">
                         Selling <b>{formatMoney(item.sellingPrice)}</b>

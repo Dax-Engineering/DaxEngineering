@@ -158,6 +158,10 @@ export const PhoneScanCode = z.strictObject({
 });
 export type PhoneScanCode = z.infer<typeof PhoneScanCode>;
 
+/** PC side: a code read by the PC's own camera or hand-held scanner. */
+export const PhoneScanPcCode = PhoneScanCode.omit({ phoneToken: true });
+export type PhoneScanPcCode = z.infer<typeof PhoneScanPcCode>;
+
 export const PhoneScanReply = z.object({
   result: z.enum(['added', 'unknown', 'several', 'bin', 'ended']),
   line: z

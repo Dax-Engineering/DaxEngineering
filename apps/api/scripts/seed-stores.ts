@@ -77,6 +77,8 @@ function seedPolicy(userId: string): Policy {
     'inventory.mrn.view',
     'inventory.mrn.create',
     'inventory.aod.view',
+    'inventory.aod.issue',
+    'inventory.aod.approve',
   ];
   return {
     userId,
@@ -281,6 +283,7 @@ async function main() {
 
     console.log(`Items (${ITEMS.length})`);
     const itemId = new Map<string, string>();
+    const itemVersion = new Map<string, number>();
     for (const it of ITEMS) {
       const extra = ITEM_EXTRAS[it.partNo];
       const created = await items.create(keeper, {
@@ -299,6 +302,24 @@ async function main() {
         sellingPrice: extra?.selling ?? null,
       });
       itemId.set(`${it.brand}|${it.partNo}`, created.id);
+      itemVersion.set(created.id, created.version);
+    }
+
+    // Older numbers point at what superseded them; the service builds the families.
+    const superseded = ITEMS.filter((it) => it.supersededBy);
+    console.log(`Superseded numbers (${superseded.length})`);
+    for (const it of superseded) {
+      const id = need(itemId, `${it.brand}|${it.partNo}`, 'item');
+      const replacementId = need(
+        itemId,
+        `${it.brand}|${it.supersededBy}`,
+        'superseding item',
+      );
+      const updated = await items.supersede(keeper, id, {
+        replacementId,
+        version: itemVersion.get(id) ?? 1,
+      });
+      itemVersion.set(id, updated.version);
     }
 
     // Opening stock goes through an opening count, the same way a real store

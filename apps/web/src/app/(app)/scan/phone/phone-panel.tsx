@@ -16,7 +16,14 @@ import {
   type PhoneScanStart,
   type PhoneScanView,
 } from '@dax/inventory-contract';
-import { Empty, Icon, Mono, QrBox } from '@dax/web-shell';
+import {
+  Empty,
+  Icon,
+  Mono,
+  QrBox,
+  type ScanReply,
+  Scanner,
+} from '@dax/web-shell';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatQty } from '../../../../lib/format';
 import {
@@ -25,6 +32,7 @@ import {
   getPhoneScan,
   type PhoneResult,
   removePhoneScanLine,
+  scanOnPc,
   setPhoneScanQty,
   startPhoneScan,
 } from './actions';
@@ -252,6 +260,41 @@ function LineCard({
   );
 }
 
+/** Scan into the same list with this PC's own camera. */
+function PcCamera({
+  onCode,
+}: {
+  onCode: (code: string, format?: string) => Promise<ScanReply>;
+}) {
+  const [on, setOn] = useState(false);
+  if (!on) {
+    return (
+      <Button
+        size="xs"
+        radius="xl"
+        variant="light"
+        leftSection={<Icon name="camera" size={14} />}
+        onClick={() => setOn(true)}
+      >
+        Scan with this PC&apos;s camera
+      </Button>
+    );
+  }
+  return (
+    <div className="dax-pp-pc-cam">
+      <Scanner onCode={onCode} compact manualEntry={false} />
+      <Button
+        size="xs"
+        radius="xl"
+        variant="default"
+        onClick={() => setOn(false)}
+      >
+        Close camera
+      </Button>
+    </div>
+  );
+}
+
 export function PhonePanel({
   origin,
   access,
@@ -374,6 +417,18 @@ export function PhonePanel({
   const expired = view && open(view) && Date.parse(view.expiresAt) <= now;
   const status = expired ? 'ENDED' : view?.status;
 
+  async function scanHere(code: string, format?: string): Promise<ScanReply> {
+    if (!view) return 'miss';
+    const reply = await scanOnPc(view.id, code, format);
+    if (!reply.ok) {
+      setError(reply.message);
+      return 'miss';
+    }
+    const fresh = await getPhoneScan(view.id);
+    if (fresh.ok) setView(fresh.data);
+    return reply.data.line ? 'ok' : 'miss';
+  }
+
   function copy(text: string, what: 'list' | 'url') {
     void navigator.clipboard?.writeText(text).then(() => {
       setCopied(what);
@@ -402,11 +457,19 @@ export function PhonePanel({
   return (
     <div className="dax-pp">
       <section className="dax-pp-hero" data-status={status ?? 'WAITING'}>
-        {status === 'WAITING' && link ? (
-          <div className="dax-pp-qr">
-            <QrBox value={pairPayload(link.linkToken, link.code)} size={148} />
-          </div>
-        ) : null}
+        <div className="dax-pp-side">
+          {status === 'WAITING' && link ? (
+            <div className="dax-pp-qr">
+              <QrBox
+                value={pairPayload(link.linkToken, link.code)}
+                size={148}
+              />
+            </div>
+          ) : null}
+          {view && open(view) && !expired ? (
+            <PcCamera onCode={scanHere} />
+          ) : null}
+        </div>
 
         <div className="dax-pp-hero-main">
           <div className="dax-pp-status">

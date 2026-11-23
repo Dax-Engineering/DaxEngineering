@@ -4,6 +4,7 @@ import {
   CatalogLists,
   ItemDetail,
   ItemInput,
+  PhoneScanReply,
   PhoneScanStart,
   PhoneScanSuggestion,
   PhoneScanView,
@@ -59,6 +60,19 @@ export async function extendPhoneScan(id: string) {
 export async function endPhoneScan(id: string) {
   if (!isId(id)) return { ok: false as const, message: 'Unknown session.' };
   return run(`${base}/${id}/end`, view, { method: 'POST' });
+}
+
+export async function scanOnPc(id: string, code: string, format?: string) {
+  const trimmed = code.trim();
+  if (!isId(id) || !trimmed || trimmed.length > 512)
+    return { ok: false as const, message: 'That code could not be read.' };
+  return run(`${base}/${id}/scan`, (d) => PhoneScanReply.parse(d), {
+    method: 'POST',
+    json: {
+      code: trimmed,
+      ...(format && /^[a-z0-9_]{2,24}$/.test(format) ? { format } : {}),
+    },
+  });
 }
 
 export async function setPhoneScanQty(id: string, lineId: string, qty: string) {

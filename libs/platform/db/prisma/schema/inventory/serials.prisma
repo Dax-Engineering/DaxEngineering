@@ -1,0 +1,65 @@
+enum SerialSource {
+  GRN
+  EXISTING
+
+  @@schema("inventory")
+}
+
+enum SerialCondition {
+  GOOD
+  DAMAGED
+
+  @@schema("inventory")
+}
+
+enum SerialStatus {
+  ACTIVE
+  VOID
+
+  @@schema("inventory")
+}
+
+/// One received unit (or one batch of a part sold by length or weight), with its Code 128 serial.
+model ItemSerial {
+  id            String          @id @default(uuid(7)) @db.Uuid
+  /// 16 Crockford base32 characters hashed from the receipt data.
+  serial        String          @unique
+  itemId        String          @map("item_id") @db.Uuid
+  item          Item            @relation(fields: [itemId], references: [id])
+  source        SerialSource
+  docType       String          @map("doc_type")
+  docId         String          @map("doc_id") @db.Uuid
+  docLineId     String?         @map("doc_line_id") @db.Uuid
+  docNumber     String?         @map("doc_number")
+  /// Where the unit was last placed: receiving or quarantine on receipt, the shelf after put-away.
+  binId         String?         @map("bin_id") @db.Uuid
+  bin           Bin?            @relation(fields: [binId], references: [id])
+  lineNo        Int?            @map("line_no")
+  unitNo        Int             @map("unit_no")
+  qty           Decimal         @db.Decimal(14, 3)
+  condition     SerialCondition
+  status        SerialStatus    @default(ACTIVE)
+  voidedAt      DateTime?       @map("voided_at") @db.Timestamptz(3)
+  receivedAt    DateTime        @map("received_at") @db.Timestamptz(3)
+  supplierName  String?         @map("supplier_name")
+  printCount    Int             @default(0) @map("print_count")
+  lastPrintedAt DateTime?       @map("last_printed_at") @db.Timestamptz(3)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([itemId, receivedAt])
+  @@index([docId])
+  @@index([docLineId])
+  @@index([binId])
+  @@map("item_serial")
+  @@schema("inventory")
+}
+
+/// One row (id 1): when serials were made for the stock already in the store.
+model ItemSerialSettings {
+  id             Int       @id @default(1)
+  existingDoneAt DateTime? @map("existing_done_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("item_serial_settings")
+  @@schema("inventory")
+}

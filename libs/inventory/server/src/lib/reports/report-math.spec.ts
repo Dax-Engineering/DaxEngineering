@@ -1,8 +1,4 @@
-import {
-  BinStockQuery,
-  MovementReportQuery,
-  SlowMovingQuery,
-} from '@dax/inventory-contract';
+import { BinStockQuery, MovementReportQuery } from '@dax/inventory-contract';
 import {
   colomboDateTime,
   colomboDay,
@@ -11,7 +7,7 @@ import {
   daysSince,
   freeOf,
   shortBy,
-  slowMovingCutoff,
+  daysOldCutoff,
   toCsv,
 } from './report-math';
 
@@ -46,9 +42,9 @@ describe('Colombo calendar days', () => {
     expect(daysSince(new Date('2026-08-12T04:00:00.000Z'), now)).toBe(90);
   });
 
-  it('puts the slow-moving cutoff so that every match is at least N days old', () => {
+  it('puts the age cutoff so that everything before it is at least N days old', () => {
     const now = new Date('2026-11-10T04:00:00.000Z');
-    const cutoff = slowMovingCutoff(90, now);
+    const cutoff = daysOldCutoff(90, now);
     expect(cutoff.toISOString()).toBe('2026-08-12T18:30:00.000Z');
     const justBefore = new Date(cutoff.getTime() - 1);
     expect(daysSince(justBefore, now)).toBe(90);
@@ -109,11 +105,6 @@ describe('report queries', () => {
     expect(
       MovementReportQuery.parse({ from: '2026-05-01', to: '2026-05-01' }),
     ).toMatchObject({ page: 1, limit: 25 });
-  });
-
-  it('defaults slow-moving to 90 days and only allows the set choices', () => {
-    expect(SlowMovingQuery.parse({}).days).toBe('90');
-    expect(SlowMovingQuery.safeParse({ days: '45' }).success).toBe(false);
   });
 
   it('accepts a zone and a bin kind for stock by bin', () => {

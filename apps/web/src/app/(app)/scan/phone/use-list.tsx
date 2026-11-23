@@ -152,7 +152,7 @@ export function UseList({
             leftSection={<Icon name="truck" size={16} />}
             onClick={() => ask('receive')}
           >
-            Receive
+            Raise GRN
           </Button>
         ) : null}
         {access.request ? (
@@ -164,7 +164,7 @@ export function UseList({
             leftSection={<Icon name="send" size={16} />}
             onClick={() => ask('request')}
           >
-            Request
+            Raise MRN
           </Button>
         ) : null}
         {access.count ? (
@@ -212,7 +212,7 @@ export function UseList({
       <Modal
         opened={request?.action === 'receive'}
         onClose={close}
-        title="Receive into stock"
+        title="Raise GRN"
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
@@ -244,7 +244,7 @@ export function UseList({
       <Modal
         opened={request?.action === 'request'}
         onClose={close}
-        title="Make a material request"
+        title="Raise MRN"
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
@@ -301,7 +301,7 @@ export function UseList({
               )
             }
           >
-            Make the request
+            Raise MRN
           </Button>
         </Stack>
       </Modal>

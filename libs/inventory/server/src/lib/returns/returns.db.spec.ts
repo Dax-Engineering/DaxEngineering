@@ -3,7 +3,9 @@ import {
   AttachmentAccessRegistry,
   AuditService,
   EventBus,
+  InboxService,
   NumberingService,
+  PolicyService,
   type RequestContext,
 } from '@dax/platform-core';
 import { PrismaService } from '@dax/platform-db';
@@ -42,6 +44,15 @@ describe.skipIf(!url)('returns against Postgres', { timeout: 60_000 }, () => {
     'inventory.return_note.create',
     'inventory.return_note.post',
   ]);
+
+  const approver = {
+    ...fakePolicy(['inventory.aod.view', 'inventory.aod.approve']),
+    userId: randomUUID(),
+  };
+  const approved = async (aod: { id: string; version: number }) => {
+    const sent = await aods.submit(policy, aod.id, aod.version);
+    return aods.approve(approver, aod.id, sent.version);
+  };
 
   const token = () => randomBytes(8).toString('hex').slice(0, 12);
   const letters = (n: number) =>
@@ -89,6 +100,7 @@ describe.skipIf(!url)('returns against Postgres', { timeout: 60_000 }, () => {
       store,
       mrns,
       new AttachmentAccessRegistry(),
+      new InboxService(prisma, new PolicyService(prisma)),
     );
     const warranty = new WarrantyService(
       prisma,
@@ -210,7 +222,9 @@ describe.skipIf(!url)('returns against Postgres', { timeout: 60_000 }, () => {
     });
     const submitted = await mrns.submit(policy, draft.id, draft.version);
     await mrns.check(policy, draft.id, submitted.version);
-    const aod = await aods.create(policy, { mrnId: draft.id, type: 'SER' });
+    const aod = await approved(
+      await aods.create(policy, { mrnId: draft.id, type: 'SER' }),
+    );
     await aods.issue(policy, aod.id, aod.version);
     aodId = aod.id;
     aodLineId = aod.lines[0]?.id as string;
@@ -276,6 +290,26 @@ describe.skipIf(!url)('returns against Postgres', { timeout: 60_000 }, () => {
       fault: 'Burnt coil',
       jobNumber: 'J-RTN',
     });
+
+    // The good units go back on the shelf with the age they left with.
+    const issuedUse = await prisma.stockLayerUse.findFirstOrThrow({
+      where: { itemId, docLineId: aodLineId },
+      include: { layer: true },
+    });
+    expect(String(issuedUse.returnedQty)).toBe('2');
+    const back = await prisma.stockLayer.findFirstOrThrow({
+      where: { itemId, source: 'RETURN' },
+    });
+    expect(String(back.qtyLeft)).toBe('2');
+    expect(back.docId).toBe(draft.id);
+    const out = back.agedFrom.getTime() - issuedUse.layer.agedFrom.getTime();
+    const returnedAt = await prisma.stockLedger.findFirstOrThrow({
+      where: { docId: draft.id, binId: binA },
+      select: { occurredAt: true },
+    });
+    expect(out).toBe(
+      returnedAt.occurredAt.getTime() - issuedUse.usedAt.getTime(),
+    );
 
     const left = await returns.returnable(policy, aodId);
     expect(left.lines.map((l) => [l.issued, l.returned, l.returnable])).toEqual(

@@ -7,6 +7,8 @@ import {
   BinQuery,
   CatalogLists,
   InventorySummary,
+  ItemAge,
+  SerialPage,
   ItemDetail,
   ItemFacets,
   ItemPage,
@@ -76,6 +78,18 @@ export function listItems(raw: Query) {
     api.request(`/inventory/items${toQuery(readQuery(ItemQuery, raw))}`, (d) =>
       ItemPage.parse(d),
     ),
+  );
+}
+
+export function getItemSerials(id: string) {
+  return api.request(`/inventory/items/${id}/serials?limit=50`, (d) =>
+    SerialPage.parse(d),
+  );
+}
+
+export function getItemAge(id: string) {
+  return api.request(`/inventory/items/${id}/age?limit=20`, (d) =>
+    ItemAge.parse(d),
   );
 }
 

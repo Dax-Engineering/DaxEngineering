@@ -91,7 +91,7 @@ export async function requestList(
   lineIds?: string[],
 ): Promise<UseResult> {
   if (!(MRN_SUBTYPES as readonly string[]).includes(input.subtype))
-    return { ok: false, message: 'Choose the request type.' };
+    return { ok: false, message: 'Choose the MRN type.' };
   if (!UUID.test(input.departmentId))
     return { ok: false, message: 'Choose a department.' };
   if (input.customerId && !UUID.test(input.customerId))
@@ -112,7 +112,7 @@ export async function requestList(
     });
     return { ok: true, path: mrnPath(mrn.id) };
   } catch (error) {
-    return failed(error, 'make the request');
+    return failed(error, 'raise the MRN');
   }
 }
 

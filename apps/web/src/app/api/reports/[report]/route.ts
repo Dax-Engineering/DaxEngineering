@@ -1,7 +1,7 @@
 import {
   BinStockQuery,
   MovementReportQuery,
-  SlowMovingQuery,
+  StockAgeQuery,
 } from '@dax/inventory-contract';
 import {
   contentDisposition,
@@ -30,8 +30,8 @@ function upstreamPath(slug: ReportSlug, search: URLSearchParams): string {
       })}`;
     case 'stock-by-bin':
       return `/inventory/reports/stock-by-bin/csv${toQuery(readQuery(BinStockQuery, raw))}`;
-    case 'slow-moving':
-      return `/inventory/reports/slow-moving/csv${toQuery(readQuery(SlowMovingQuery, raw))}`;
+    case 'stock-age':
+      return `/inventory/reports/stock-age/csv${toQuery(readQuery(StockAgeQuery, raw))}`;
   }
 }
 

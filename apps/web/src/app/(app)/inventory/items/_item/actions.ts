@@ -23,7 +23,8 @@ const STALE =
 const CODES = {
   ITEM_EXISTS: 'This brand already has an item with this part number.',
   BARCODE_IN_USE: 'This barcode is already on another item.',
-  SUPERSESSION_CYCLE: 'That replacement would loop back to this item.',
+  SUPERSESSION_CYCLE:
+    'That would make this part number supersede itself in a loop.',
 };
 
 function readForm(form: FormData) {
@@ -177,7 +178,7 @@ export async function setReplacement(
       json: body,
     });
   } catch (error) {
-    return failure(error, 'Could not save the replacement.', CODES);
+    return failure(error, 'Could not save the supersession.', CODES);
   }
   return done(
     id,

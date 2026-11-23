@@ -7,6 +7,7 @@ import { RequestContext } from '@dax/platform-core';
 import { Prisma, type TransactionClient } from '@dax/platform-db';
 import { MainStore } from '../main-store.service';
 import { dec, qtyString } from '../stock-math';
+import { type AgeEntry, applyStockAge } from './stock-age';
 
 export type MovementKind =
   | 'RECEIVE'
@@ -57,6 +58,16 @@ interface BinInfo {
   kind: 'STORAGE' | 'RECEIVING' | 'QUARANTINE' | 'WARRANTY';
   active: boolean;
   countId: string | null;
+}
+
+/** Free stock of a family, counting no member below zero. */
+export function totalFree(
+  members: readonly { free: Prisma.Decimal }[],
+): Prisma.Decimal {
+  return members.reduce(
+    (sum, m) => sum.plus(Prisma.Decimal.max(m.free, 0)),
+    dec(0),
+  );
 }
 
 export function notEnoughFree(itemId: string): never {
@@ -146,6 +157,9 @@ export class StockPostingService {
     );
     const requestId = this.context.get().requestId ?? null;
     const posted: PostedMovement[] = [];
+    const aged: AgeEntry[] = [];
+    // One time for the whole batch, so stock age can replay it as one batch.
+    const at = new Date();
 
     for (const m of orderMovements(movements)) {
       const bin = bins.get(m.binId);
@@ -227,6 +241,7 @@ export class StockPostingService {
 
       const ledger = await tx.stockLedger.create({
         data: {
+          occurredAt: at,
           storeId,
           itemId: m.itemId,
           binId: m.binId,
@@ -243,6 +258,18 @@ export class StockPostingService {
         },
         select: { id: true },
       });
+      if (bin.kind === 'STORAGE') {
+        aged.push({
+          itemId: m.itemId,
+          qty,
+          movement: m.movement,
+          docType: m.docType,
+          docId: m.docId,
+          docLineId: m.docLineId ?? null,
+          docNumber: m.docNumber ?? null,
+          ledgerId: ledger.id,
+        });
+      }
       posted.push({
         ledgerId: ledger.id,
         itemId: m.itemId,
@@ -251,6 +278,7 @@ export class StockPostingService {
         binQtyAfter,
       });
     }
+    if (aged.length) await applyStockAge(tx, storeId, at, aged);
     return posted;
   }
 
@@ -301,26 +329,73 @@ export class StockPostingService {
       VALUES (gen_random_uuid(), ${storeId}::uuid, ${r.itemId}::uuid,
               ${r.source}::inventory."ReservationSource", ${r.sourceId}::uuid,
               ${r.sourceLineId}::uuid, ${amount}::numeric, now(), now())
-      ON CONFLICT (source, source_line_id)
+      ON CONFLICT (source, source_line_id, item_id)
       DO UPDATE SET qty = inventory.reservation.qty + EXCLUDED.qty, updated_at = now()`;
   }
 
+  /** Free stock of every number in a family, oldest first, locked for reserving. */
+  async lockFamilyFree(
+    tx: TransactionClient,
+    familyId: string,
+  ): Promise<{ itemId: string; free: Prisma.Decimal }[]> {
+    const storeId = await this.store.id();
+    const rows = await tx.$queryRaw<
+      { item_id: string; free: Prisma.Decimal }[]
+    >`
+      SELECT i.id::text AS item_id, b.on_hand - b.held - b.quarantine - b.receiving AS free
+      FROM inventory.item i
+      JOIN inventory.stock_balance b ON b.item_id = i.id AND b.store_id = ${storeId}::uuid
+      WHERE i.family_id = ${familyId}::uuid
+      ORDER BY i.family_depth DESC, i.part_no, i.id
+      FOR UPDATE OF b`;
+    return rows.map((r) => ({ itemId: r.item_id, free: dec(r.free) }));
+  }
+
+  /**
+   * Reserves up to `qty` across a family, oldest number first; returns what was reserved per item.
+   * Pass `exact` to refuse rather than reserve less than asked.
+   */
+  async reserveFromFamily(
+    tx: TransactionClient,
+    r: ReservationTarget & {
+      familyId: string;
+      qty: Prisma.Decimal | string;
+      exact?: boolean;
+    },
+  ): Promise<{ itemId: string; qty: Prisma.Decimal }[]> {
+    let left = dec(r.qty);
+    if (!left.gt(0)) return [];
+    const members = await this.lockFamilyFree(tx, r.familyId);
+    const total = totalFree(members);
+    if (r.exact && total.lt(left)) notEnoughFree(r.familyId);
+    const taken: { itemId: string; qty: Prisma.Decimal }[] = [];
+    for (const m of members) {
+      if (!left.gt(0)) break;
+      const take = Prisma.Decimal.min(left, Prisma.Decimal.max(m.free, 0));
+      if (!take.gt(0)) continue;
+      await this.reserve(tx, { ...r, itemId: m.itemId, qty: take });
+      taken.push({ itemId: m.itemId, qty: take });
+      left = left.minus(take);
+    }
+    return taken;
+  }
+
+  /** Releases every reservation on a line, whichever family numbers it holds. */
   async release(
     tx: TransactionClient,
     source: ReservationSourceKind,
     sourceLineId: string,
-    qty?: Prisma.Decimal | string,
   ): Promise<Prisma.Decimal> {
-    const row = await this.lockReservation(tx, source, sourceLineId);
-    if (!row) return dec(0);
-    const amount =
-      qty === undefined ? row.qty : Prisma.Decimal.min(dec(qty), row.qty);
-    if (!amount.gt(0)) return dec(0);
-    await tx.$executeRaw`
-      UPDATE inventory.stock_balance SET held = held - ${qtyString(amount)}::numeric, updated_at = now()
-      WHERE store_id = ${row.storeId}::uuid AND item_id = ${row.itemId}::uuid`;
-    await this.shrinkReservation(tx, row, amount);
-    return amount;
+    const rows = await this.lockReservations(tx, source, sourceLineId);
+    let total = dec(0);
+    for (const row of rows) {
+      await tx.$executeRaw`
+        UPDATE inventory.stock_balance SET held = held - ${qtyString(row.qty)}::numeric, updated_at = now()
+        WHERE store_id = ${row.storeId}::uuid AND item_id = ${row.itemId}::uuid`;
+      await this.shrinkReservation(tx, row, row.qty);
+      total = total.plus(row.qty);
+    }
+    return total;
   }
 
   async transfer(
@@ -343,11 +418,11 @@ export class StockPostingService {
     source: ReservationSourceKind,
     sourceLineId: string,
   ): Promise<Prisma.Decimal> {
-    const row = await tx.reservation.findUnique({
-      where: { source_sourceLineId: { source, sourceLineId } },
+    const rows = await tx.reservation.findMany({
+      where: { source, sourceLineId },
       select: { qty: true },
     });
-    return dec(row?.qty ?? 0);
+    return rows.reduce((sum, r) => sum.plus(dec(r.qty)), dec(0));
   }
 
   async issueReserved(
@@ -359,11 +434,13 @@ export class StockPostingService {
     actorId: string,
   ): Promise<PostedMovement[]> {
     const qty = dec(issue.qty);
-    const row = await this.lockReservation(tx, 'MRN', issue.mrnLineId);
+    const row = (
+      await this.lockReservations(tx, 'MRN', issue.mrnLineId, issue.itemId)
+    )[0];
     if (!row || row.qty.lt(qty)) {
       throw new ConflictException({
         code: 'NOT_RESERVED',
-        message: 'That quantity is not reserved for this request.',
+        message: 'That quantity is not reserved for this MRN.',
       });
     }
     await this.shrinkReservation(tx, row, qty);
@@ -386,26 +463,27 @@ export class StockPostingService {
     );
   }
 
-  private async lockReservation(
+  private async lockReservations(
     tx: TransactionClient,
     source: ReservationSourceKind,
     sourceLineId: string,
+    itemId?: string,
   ) {
-    const [row] = await tx.$queryRaw<
+    const rows = await tx.$queryRaw<
       { id: string; store_id: string; item_id: string; qty: Prisma.Decimal }[]
     >`
       SELECT id, store_id, item_id, qty FROM inventory.reservation
       WHERE source = ${source}::inventory."ReservationSource"
         AND source_line_id = ${sourceLineId}::uuid
+        AND (${itemId ?? null}::uuid IS NULL OR item_id = ${itemId ?? null}::uuid)
+      ORDER BY item_id
       FOR UPDATE`;
-    return row
-      ? {
-          id: row.id,
-          storeId: row.store_id,
-          itemId: row.item_id,
-          qty: dec(row.qty),
-        }
-      : null;
+    return rows.map((row) => ({
+      id: row.id,
+      storeId: row.store_id,
+      itemId: row.item_id,
+      qty: dec(row.qty),
+    }));
   }
 
   private async shrinkReservation(

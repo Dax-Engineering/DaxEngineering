@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
-import { grantOf, type Policy } from '@dax/platform-core';
+import { can, grantOf, type Policy } from '@dax/platform-core';
 import type { Prisma, TransactionClient } from '@dax/platform-db';
 import { canRead, conflict, invalid } from '../common';
 import { holdEntity, mrnEntity } from '../entities';
@@ -77,9 +77,57 @@ export function mrnScope(
     : { departmentId: { in: scope.departments } };
 }
 
+export const AOD_APPROVE = 'inventory.aod.approve';
+
+/** AODs the policy may approve: null when it cannot approve any. */
+export function aodApproveScope(policy: Policy): Prisma.AodWhereInput | null {
+  const grant = grantOf(policy, AOD_APPROVE);
+  if (!grant) return null;
+  return grant.scope === 'ALL'
+    ? {}
+    : { mrn: { departmentId: { in: [...policy.departmentIds] } } };
+}
+
+/** Whether the policy may approve an AOD raised for this department. */
+export function canApproveFor(policy: Policy, departmentId: string): boolean {
+  const grant = grantOf(policy, AOD_APPROVE);
+  if (!grant) return false;
+  return grant.scope === 'ALL' || policy.departmentIds.includes(departmentId);
+}
+
+/** Stores (who issue AODs) see every AOD; others only approved ones, plus those waiting for their approval. */
 export function aodScope(policy: Policy): Prisma.AodWhereInput {
   const mrn = mrnScope(policy, 'inventory.aod.view');
-  return Object.keys(mrn).length === 0 ? {} : { mrn };
+  const viewable: Prisma.AodWhereInput =
+    Object.keys(mrn).length === 0 ? {} : { mrn };
+  if (can(policy, 'inventory.aod.issue')) return viewable;
+  const approvable = aodApproveScope(policy);
+  return {
+    AND: [
+      viewable,
+      {
+        OR: [
+          { approvedAt: { not: null } },
+          ...(approvable
+            ? [{ AND: [{ status: 'PENDING_APPROVAL' as const }, approvable] }]
+            : []),
+        ],
+      },
+    ],
+  };
+}
+
+/** The in-memory form of the approval part of `aodScope`, for AODs listed on a request. */
+export function seesAod(
+  policy: Policy,
+  aod: { status: string; approvedAt: Date | null },
+  departmentId: string,
+): boolean {
+  if (can(policy, 'inventory.aod.issue')) return true;
+  if (aod.approvedAt) return true;
+  return (
+    aod.status === 'PENDING_APPROVAL' && canApproveFor(policy, departmentId)
+  );
 }
 
 export function seesHoldCustomer(policy: Policy): boolean {

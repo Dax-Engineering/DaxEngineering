@@ -1,3 +1,4 @@
+import { seesMrnCustomer } from './issuing/shared';
 import { Injectable } from '@nestjs/common';
 import { type ImportResult, pageMeta, pageWindow } from '@dax/contracts';
 import {
@@ -43,21 +44,27 @@ import {
   belowMinIds,
   cleanTags,
   extrasFilter,
+  familySearch,
+  familySelect,
   ITEM_EXTRAS_SELECT,
   itemExtras,
-  itemSearch,
   nextOfFor,
 } from './item-queries';
 import { MainStore } from './main-store.service';
 import { activeSupplier } from './receiving/shared';
 import {
   dec,
+  familyFigures,
   isBelowMin,
   isWhole,
   qtyString,
   stockFigures,
 } from './stock-math';
-import { createsCycle, latestReplacementId } from './supersession';
+import {
+  createsCycle,
+  latestReplacementId,
+  refreshFamily,
+} from './supersession';
 
 const ITEM_REF = {
   id: true,
@@ -79,6 +86,7 @@ function summarySelect(storeId: string) {
       where: { storeId },
       select: { onHand: true, held: true, quarantine: true, receiving: true },
     },
+    family: familySelect(storeId),
     ...ITEM_EXTRAS_SELECT,
   } as const;
 }
@@ -120,8 +128,11 @@ const toRef = (row: RefRow) => ({
   brand: row.brand.name,
 });
 
-export function toSummary(row: SummaryRow): ItemSummary {
-  const { figures, onHand } = stockFigures(row.balances[0]);
+/** `familyStock` shows the family's combined stock (lists); otherwise the item's own. */
+export function toSummary(row: SummaryRow, familyStock = false): ItemSummary {
+  const own = stockFigures(row.balances[0]);
+  const family = familyFigures(row.family.familyMembers);
+  const figures = familyStock ? family.stock : own.figures;
   return {
     id: row.id,
     partNo: row.partNo,
@@ -132,7 +143,8 @@ export function toSummary(row: SummaryRow): ItemSummary {
     supersededBy: row.supersededBy ? toRef(row.supersededBy) : null,
     minQty: qtyString(row.minQty),
     stock: figures,
-    belowMin: isBelowMin(onHand, row.minQty),
+    belowMin: isBelowMin(family.onHand, row.minQty),
+    family: { stock: family.stock, members: family.members },
     ...itemExtras(row),
   };
 }
@@ -183,6 +195,7 @@ export class ItemsService {
     const where: Prisma.ItemWhereInput = {
       AND: [
         query.status === 'ALL' ? {} : { status: query.status },
+        { supersededById: null },
         query.brandId ? { brandId: query.brandId } : {},
         query.machineModelId
           ? {
@@ -191,7 +204,7 @@ export class ItemsService {
               },
             }
           : {},
-        itemSearch(query.q),
+        familySearch(query.q),
         belowMinFilter(query.belowMin, ids),
         extrasFilter(query),
       ],
@@ -205,7 +218,10 @@ export class ItemsService {
       }),
       this.prisma.item.count({ where }),
     ]);
-    return { items: rows.map(toSummary), ...pageMeta(query, total) };
+    return {
+      items: rows.map((r) => toSummary(r, true)),
+      ...pageMeta(query, total),
+    };
   }
 
   async facets(): Promise<ItemFacets> {
@@ -250,6 +266,13 @@ export class ItemsService {
             select: ITEM_REF,
           })
         : row.supersededBy;
+    const customerParts = seesMrnCustomer(policy)
+      ? await this.prisma.customerPart.findMany({
+          where: { itemId: row.id },
+          select: { customerId: true, customerName: true, partNo: true },
+          orderBy: [{ customerName: 'asc' }, { partNo: 'asc' }],
+        })
+      : [];
     return {
       ...toSummary(row),
       allowFraction: row.allowFraction,
@@ -267,6 +290,7 @@ export class ItemsService {
         binCode: s.bin.code,
         qty: qtyString(s.qty),
       })),
+      customerParts,
       version: row.version,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -493,14 +517,16 @@ export class ItemsService {
     if (!before) notFound('Item not found.');
     const replacementId = input.replacementId;
     if (replacementId === id)
-      invalid('An item cannot replace itself.', ['replacementId']);
+      invalid('A part number cannot supersede itself.', ['replacementId']);
     if (replacementId) {
       const exists = await this.prisma.item.findUnique({
         where: { id: replacementId },
         select: { id: true },
       });
       if (!exists)
-        invalid('The replacement item does not exist.', ['replacementId']);
+        invalid('The superseding part number does not exist.', [
+          'replacementId',
+        ]);
     }
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('inventory.item.supersession'))`;
@@ -508,7 +534,9 @@ export class ItemsService {
         replacementId &&
         (await createsCycle(id, replacementId, nextOfFor(tx)))
       ) {
-        invalid('That would make a loop of replacements.', ['replacementId']);
+        invalid('That would make a loop of superseded part numbers.', [
+          'replacementId',
+        ]);
       }
       const bumped = await tx.item.updateMany({
         where: { id, version: input.version },
@@ -519,6 +547,7 @@ export class ItemsService {
         },
       });
       if (bumped.count === 0) stale();
+      await refreshFamily(tx, id);
       await this.record(
         tx,
         id,

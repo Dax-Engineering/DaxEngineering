@@ -169,6 +169,36 @@ describe.skipIf(!url)(
       expect((await phone.state(phoneToken)).status).toBe('ENDED');
     });
 
+    it("the PC's own camera adds to the same list, before and after pairing", async () => {
+      const start = await phone.start(pc);
+      expect(
+        (await phone.scanFromPc(pc, start.id, { code: barcode })).result,
+      ).toBe('added');
+
+      const paired = await phone.pair({
+        linkToken: start.linkToken,
+        code: start.code,
+      });
+      if (!paired.ok) throw new Error('did not pair');
+      await phone.scan({ phoneToken: paired.phoneToken, code: barcode });
+      expect(
+        (await phone.scanFromPc(pc, start.id, { code: binCode })).result,
+      ).toBe('bin');
+
+      const view = await phone.view(pc, start.id);
+      expect(view.lines.map((l) => [l.code, l.qty])).toEqual([[barcode, '2']]);
+
+      const other = { ...pc, userId: '0190a000-0000-7000-8000-0000000000ee' };
+      await expect(
+        phone.scanFromPc(other, start.id, { code: barcode }),
+      ).rejects.toThrow();
+
+      await phone.end(pc, start.id);
+      expect(
+        (await phone.scanFromPc(pc, start.id, { code: barcode })).result,
+      ).toBe('ended');
+    });
+
     it('locks the link after five wrong codes', async () => {
       const start = await phone.start(pc);
       const wrong = start.code === '999999' ? '888888' : '999999';

@@ -38,6 +38,16 @@ export const coreManifest = defineModule({
       actions: { view: {}, manage: {} },
     },
     departments: { name: 'Departments', actions: { view: {}, manage: {} } },
+    department: {
+      name: 'Department head',
+      actions: {
+        head: {
+          label: 'Head of department',
+          description:
+            'Gets department head messages, such as low-stock alerts.',
+        },
+      },
+    },
     modules: {
       name: 'Modules',
       actions: { view: {}, manage: { label: 'Turn modules on and off' } },

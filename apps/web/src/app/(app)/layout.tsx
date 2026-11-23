@@ -6,7 +6,9 @@ import {
   Icon,
   type ShellNavItem,
 } from '@dax/web-shell';
-import { requireCapabilities, requireReadyUser } from '../../lib/server';
+import { InboxCount } from '@dax/platform-contract';
+import { ScanMenu } from '../../components/scan-menu';
+import { api, requireCapabilities, requireReadyUser } from '../../lib/server';
 
 const SECTIONS = [
   {
@@ -19,7 +21,7 @@ const SECTIONS = [
     key: 'items',
     label: 'Items',
     icon: 'tag',
-    menu: ['inventory.items', 'inventory.catalog'],
+    menu: ['inventory.items', 'inventory.bundles', 'inventory.catalog'],
   },
   {
     key: 'receiving',
@@ -95,6 +97,31 @@ function buildNav(menu: MenuEntry[]): ShellNavItem[] {
   ];
 }
 
+async function unreadCount(): Promise<number> {
+  try {
+    const { unread } = await api.request('/me/inbox/count', (d) =>
+      InboxCount.parse(d),
+    );
+    return unread;
+  } catch {
+    return 0;
+  }
+}
+
+function InboxBell({ unread }: { unread: number }) {
+  const label = unread
+    ? `Inbox, ${unread} unread ${unread === 1 ? 'message' : 'messages'}`
+    : 'Inbox';
+  return (
+    <Link href="/inbox" className="dax-bell" aria-label={label} title={label}>
+      <Icon name="bell" size={20} />
+      {unread ? (
+        <span className="dax-bell-count">{unread > 99 ? '99+' : unread}</span>
+      ) : null}
+    </Link>
+  );
+}
+
 export default async function AppLayout({
   children,
 }: {
@@ -106,6 +133,7 @@ export default async function AppLayout({
     canDo(caps, 'inventory.item.view') ||
     canDo(caps, 'inventory.location.view');
   const nav = buildNav(caps.menu);
+  const unread = await unreadCount();
   return (
     <CapabilityProvider value={caps}>
       <DaxShell
@@ -116,14 +144,16 @@ export default async function AppLayout({
         scan={canScan ? { href: '/scan', label: 'Scan' } : undefined}
         mobileKeys={['home', 'stock', 'issuing']}
         actions={
-          // On the PC the only scan option is lending a phone; phones scan
-          // with their own camera from the bottom bar.
-          canDo(caps, 'inventory.item.view') ? (
-            <Link href="/scan/phone" className="dax-cta">
-              <Icon name="phone" size={20} />
-              Scan with phone
-            </Link>
-          ) : null
+          // Phones scan from the bottom bar; the scan buttons are PC-only.
+          <>
+            <InboxBell unread={unread} />
+            {canScan ? (
+              <ScanMenu
+                here={canScan}
+                phone={canDo(caps, 'inventory.item.view')}
+              />
+            ) : null}
+          </>
         }
       >
         {children}

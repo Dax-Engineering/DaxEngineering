@@ -24,7 +24,7 @@ import {
   userNames,
 } from '../receiving/shared';
 import { dec, qtyString } from '../stock-math';
-import { StockPostingService } from '../stock/stock-posting.service';
+import { StockPostingService, totalFree } from '../stock/stock-posting.service';
 import { assertHoldActive } from './rules';
 import {
   activeCustomer,
@@ -176,17 +176,31 @@ export class HoldsService {
 
     try {
       const id = await this.prisma.$transaction(async (tx) => {
-        const totals = new Map<string, Prisma.Decimal>();
+        const families = new Map(
+          (
+            await tx.item.findMany({
+              where: { id: { in: input.lines.map((l) => l.itemId) } },
+              select: { id: true, familyId: true },
+            })
+          ).map((i) => [i.id, i.familyId]),
+        );
+        const familyOf = (itemId: string) => families.get(itemId) ?? itemId;
+        const totals = new Map<
+          string,
+          { total: Prisma.Decimal; itemId: string }
+        >();
         for (const l of input.lines) {
-          totals.set(
-            l.itemId,
-            (totals.get(l.itemId) ?? dec(0)).plus(dec(l.qty)),
-          );
+          const key = familyOf(l.itemId);
+          const now = totals.get(key);
+          totals.set(key, {
+            total: (now?.total ?? dec(0)).plus(dec(l.qty)),
+            itemId: now?.itemId ?? l.itemId,
+          });
         }
-        for (const [itemId, total] of [...totals].sort(([a], [b]) =>
-          a.localeCompare(b),
+        for (const [familyId, { total, itemId }] of [...totals].sort(
+          ([a], [b]) => a.localeCompare(b),
         )) {
-          const free = await this.stock.lockFreeQty(tx, itemId);
+          const free = totalFree(await this.stock.lockFamilyFree(tx, familyId));
           if (free.lt(total)) notEnoughFor(partNo(itemId), qtyString(free));
         }
         const { number } = await this.numbering.next(tx, {
@@ -217,15 +231,16 @@ export class HoldsService {
           },
         });
         const lines = [...hold.lines].sort((a, b) =>
-          a.itemId.localeCompare(b.itemId),
+          familyOf(a.itemId).localeCompare(familyOf(b.itemId)),
         );
         for (const line of lines) {
-          await this.stock.reserve(tx, {
+          await this.stock.reserveFromFamily(tx, {
             source: 'HOLD',
             sourceId: hold.id,
             sourceLineId: line.id,
-            itemId: line.itemId,
+            familyId: familyOf(line.itemId),
             qty: line.qty,
+            exact: true,
           });
         }
         await this.audit.record(

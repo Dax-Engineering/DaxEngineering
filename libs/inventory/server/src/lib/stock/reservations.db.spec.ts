@@ -150,11 +150,20 @@ describe.skipIf(!url)(
       expect(await balance()).toEqual({ onHand: '10', held: '6' });
     });
 
-    it('releases part and moves the rest from a hold to a request', async () => {
+    it('releases a hold and moves a new one to a request', async () => {
       const released = await prisma.$transaction((tx) =>
-        engine.release(tx, 'HOLD', holdLine, '1'),
+        engine.release(tx, 'HOLD', holdLine),
       );
-      expect(String(released)).toBe('1');
+      expect(String(released)).toBe('6');
+      await prisma.$transaction((tx) =>
+        engine.reserve(tx, {
+          source: 'HOLD',
+          sourceId: holdId,
+          sourceLineId: holdLine,
+          itemId,
+          qty: '5',
+        }),
+      );
       await prisma.$transaction((tx) =>
         engine.transfer(
           tx,

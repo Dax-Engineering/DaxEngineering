@@ -4,6 +4,7 @@ import {
   AodDto,
   AodPage,
   AodQuery,
+  BundlePage,
   HoldDto,
   HoldPage,
   HoldQuery,
@@ -29,6 +30,18 @@ export const getDepartments = cache(async () => {
     { departments: [] },
   );
   return departments;
+});
+
+/** Saved bundles to offer on an MRN; empty without permission to see them. */
+export const getSavedBundles = cache(async () => {
+  const page = await unlessForbidden(
+    api.request(
+      `/inventory/bundles${toQuery({ status: 'ACTIVE', limit: 100 })}`,
+      (d) => BundlePage.parse(d),
+    ),
+    { items: [], total: 0, page: 1, limit: 100 },
+  );
+  return page.items.map((b) => ({ value: b.id, label: b.name }));
 });
 
 export function listMrns(raw: Query) {

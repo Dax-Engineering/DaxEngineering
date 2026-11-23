@@ -18,7 +18,16 @@ import {
   Pager,
   SectionCard,
 } from '@dax/web-shell';
-import { names, TagChips } from '../../../../components/item-extras';
+import {
+  FamilyBar,
+  FamilyList,
+  FamilyMemberPart,
+  FamilyShare,
+  FamilyToggle,
+  inStock,
+  names,
+  TagChips,
+} from '../../../../components/item-extras';
 import { ListFilters } from '../../../../components/list-filters';
 import { BelowMinBadge, StockLine } from '../../../../components/stock';
 import { formatCount, formatMoney, formatQty } from '../../../../lib/format';
@@ -31,6 +40,27 @@ function Bins({ row }: { row: StockRow }) {
   return (
     <div className="dax-chips" style={{ gap: 4 }}>
       {row.bins.map((b) => (
+        <span key={`${b.code}-${b.partNo ?? ''}`} className="dax-pill">
+          <Mono>{b.code}</Mono> {formatQty(b.qty)}
+          {b.partNo ? (
+            <>
+              {' '}
+              of <Mono>{b.partNo}</Mono>
+            </>
+          ) : null}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The bins holding one number of the family. */
+function MemberBins({ row, partNo }: { row: StockRow; partNo: string }) {
+  const bins = row.bins.filter((b) => (b.partNo ?? row.item.partNo) === partNo);
+  if (bins.length === 0) return <span className="dax-muted">—</span>;
+  return (
+    <div className="dax-chips" style={{ gap: 4 }}>
+      {bins.map((b) => (
         <span key={b.code} className="dax-pill">
           <Mono>{b.code}</Mono> {formatQty(b.qty)}
         </span>
@@ -52,16 +82,20 @@ export default async function StockPage({
     itemFilterSelects(),
   ]);
   const canSeeItems = canDo(caps, 'inventory.item.view');
-  const part = (row: StockRow) =>
-    canSeeItems ? (
-      <Link href={`/inventory/items/${row.item.id}`} className="dax-link">
-        <Mono>{row.item.partNo}</Mono>
-      </Link>
-    ) : (
-      <b>
-        <Mono>{row.item.partNo}</Mono>
-      </b>
-    );
+  const part = (row: StockRow) => (
+    <>
+      {canSeeItems ? (
+        <Link href={`/inventory/items/${row.item.id}`} className="dax-link">
+          <Mono>{row.item.partNo}</Mono>
+        </Link>
+      ) : (
+        <b>
+          <Mono>{row.item.partNo}</Mono>
+        </b>
+      )}
+      <FamilyToggle family={inStock(row.family)} />
+    </>
+  );
   const filtered = Boolean(
     query['q'] ||
     query['inStock'] ||
@@ -133,9 +167,9 @@ export default async function StockPage({
                     <TableTh>Bins</TableTh>
                   </TableTr>
                 </TableThead>
-                <TableTbody>
-                  {page.items.map((row) => (
-                    <TableTr key={row.item.id}>
+                {page.items.map((row) => (
+                  <TableTbody key={row.item.id}>
+                    <TableTr>
                       <TableTd>{part(row)}</TableTd>
                       <TableTd>{row.item.brand}</TableTd>
                       <TableTd>
@@ -146,6 +180,7 @@ export default async function StockPage({
                       <TableTd>{names(row.machineTypes)}</TableTd>
                       <TableTd className="dax-num">
                         {formatQty(row.stock.onHand)}
+                        <FamilyBar family={inStock(row.family)} />
                       </TableTd>
                       <TableTd className="dax-num">
                         {formatQty(row.stock.held)}
@@ -180,8 +215,37 @@ export default async function StockPage({
                         <Bins row={row} />
                       </TableTd>
                     </TableTr>
-                  ))}
-                </TableTbody>
+                    {inStock(row.family).members.length > 1
+                      ? inStock(row.family).members.map((m) => (
+                          <TableTr key={m.id} className="dax-fam-sub">
+                            <TableTd colSpan={5}>
+                              <FamilyMemberPart member={m} />
+                            </TableTd>
+                            <TableTd className="dax-num">
+                              {formatQty(m.onHand)}
+                              <FamilyShare
+                                member={m}
+                                family={inStock(row.family)}
+                              />
+                            </TableTd>
+                            <TableTd className="dax-num">
+                              {formatQty(m.held)}
+                            </TableTd>
+                            <TableTd className="dax-num">
+                              {formatQty(m.free)}
+                            </TableTd>
+                            <TableTd className="dax-num">
+                              {formatQty(m.receiving)}
+                            </TableTd>
+                            <TableTd colSpan={3} />
+                            <TableTd>
+                              <MemberBins row={row} partNo={m.partNo} />
+                            </TableTd>
+                          </TableTr>
+                        ))
+                      : null}
+                  </TableTbody>
+                ))}
               </Table>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
@@ -210,6 +274,8 @@ export default async function StockPage({
                       </span>
                     ) : null}
                     <StockLine stock={row.stock} />
+                    <FamilyBar family={inStock(row.family)} />
+                    <FamilyList family={inStock(row.family)} />
                     {row.preCostPrice || row.sellingPrice ? (
                       <span className="dax-sub">
                         Pre-cost {formatMoney(row.preCostPrice)} · Selling{' '}

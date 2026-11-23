@@ -38,7 +38,14 @@ const MRN_STATUSES: MrnStatus[] = [
   'SHORT_CLOSED',
   'CANCELLED',
 ];
-const AOD_STATUSES: AodStatus[] = ['PICKING', 'ISSUED', 'SIGNED', 'CANCELLED'];
+const AOD_STATUSES: AodStatus[] = [
+  'PICKING',
+  'PENDING_APPROVAL',
+  'APPROVED',
+  'ISSUED',
+  'SIGNED',
+  'CANCELLED',
+];
 
 describe('MRN state machine', () => {
   const allowed: [MrnAction, MrnStatus[]][] = [
@@ -66,8 +73,12 @@ describe('MRN state machine', () => {
 describe('AOD state machine', () => {
   const allowed: [AodAction, AodStatus[]][] = [
     ['edit', ['PICKING']],
-    ['issue', ['PICKING']],
-    ['cancel', ['PICKING']],
+    ['submit', ['PICKING']],
+    ['withdraw', ['PENDING_APPROVAL']],
+    ['approve', ['PENDING_APPROVAL']],
+    ['reject', ['PENDING_APPROVAL']],
+    ['issue', ['APPROVED']],
+    ['cancel', ['PICKING', 'PENDING_APPROVAL', 'APPROVED']],
     ['sign', ['ISSUED']],
   ];
 

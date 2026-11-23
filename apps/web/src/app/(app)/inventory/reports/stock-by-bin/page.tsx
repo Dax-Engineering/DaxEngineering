@@ -25,6 +25,7 @@ import { formatDateTime, formatQty } from '../../../../../lib/format';
 import { flatten, type SearchParams } from '../../../../../lib/query';
 import { requirePermission } from '../../../../../lib/server';
 import { getZones } from '../../_lib/data';
+import { SerialLabelsButton } from '../../../../../components/serial-labels';
 import { ExportButton, PrintButton } from '../_lib/buttons';
 import { PartNo, TruncatedNote } from '../_lib/cells';
 import { getStockByBin } from '../_lib/data';
@@ -106,6 +107,11 @@ export default async function StockByBinPage({
   const [zones, report] = await Promise.all([getZones(), getStockByBin(query)]);
   const linked = canDo(caps, 'inventory.item.view');
   const canExport = canDo(caps, 'inventory.stock.export');
+  const canPrintSerials =
+    canDo(caps, 'inventory.item.print_label') ||
+    canDo(caps, 'inventory.grn.post') ||
+    canDo(caps, 'inventory.grn.putaway');
+  const shownBins = report.bins.map((b) => b.id).slice(0, 500);
   const groups = groupByZone(report.bins);
   const zone = zones.find((z) => z.id === query['zoneId']);
   const kind = KIND_OPTIONS.find((k) => k.value === query['kind']);
@@ -126,6 +132,13 @@ export default async function StockByBinPage({
           report.bins.length ? (
             <>
               <PrintButton />
+              {canPrintSerials ? (
+                <SerialLabelsButton
+                  scope={{ binIds: shownBins }}
+                  label="Print serial labels"
+                  unprintedOnly
+                />
+              ) : null}
               {canExport ? (
                 <ExportButton href={exportHref('stock-by-bin', query)} />
               ) : null}

@@ -38,6 +38,57 @@ export function stockFigures(balance: BalanceRow | null | undefined): {
   };
 }
 
+type FamilyMember = {
+  id: string;
+  partNo: string;
+  familyDepth: number;
+  supersededBy: { partNo: string } | null;
+  balances: readonly BalanceRow[];
+};
+
+/** Stock of every family number plus the family total; members come oldest first. */
+export function familyFigures(members: readonly FamilyMember[]): {
+  stock: StockFigures;
+  onHand: Prisma.Decimal;
+  members: {
+    id: string;
+    partNo: string;
+    current: boolean;
+    supersededBy: string | null;
+    onHand: string;
+    held: string;
+    free: string;
+    receiving: string;
+  }[];
+} {
+  const sum = {
+    onHand: dec(0),
+    held: dec(0),
+    quarantine: dec(0),
+    receiving: dec(0),
+  };
+  const rows = members.map((m) => {
+    const b = m.balances[0];
+    sum.onHand = sum.onHand.plus(dec(b?.onHand ?? 0));
+    sum.held = sum.held.plus(dec(b?.held ?? 0));
+    sum.quarantine = sum.quarantine.plus(dec(b?.quarantine ?? 0));
+    sum.receiving = sum.receiving.plus(dec(b?.receiving ?? 0));
+    const { figures } = stockFigures(b);
+    return {
+      id: m.id,
+      partNo: m.partNo,
+      current: m.familyDepth === 0,
+      supersededBy: m.supersededBy?.partNo ?? null,
+      onHand: figures.onHand,
+      held: figures.held,
+      free: figures.free,
+      receiving: figures.receiving,
+    };
+  });
+  const { figures, onHand } = stockFigures(sum);
+  return { stock: figures, onHand, members: rows };
+}
+
 export function isBelowMin(onHand: DecimalLike, minQty: DecimalLike): boolean {
   const min = dec(minQty);
   return min.gt(0) && dec(onHand).lt(min);

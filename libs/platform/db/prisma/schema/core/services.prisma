@@ -137,3 +137,21 @@ model JobRun {
   @@map("job_run")
   @@schema("core")
 }
+
+model InboxMessage {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  kind      String
+  title     String
+  body      String
+  link      String?
+  sourceKey String    @map("source_key")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  readAt    DateTime? @map("read_at") @db.Timestamptz(3)
+  doneAt    DateTime? @map("done_at") @db.Timestamptz(3)
+
+  @@unique([userId, sourceKey])
+  @@index([userId, doneAt, createdAt])
+  @@map("inbox_message")
+  @@schema("core")
+}

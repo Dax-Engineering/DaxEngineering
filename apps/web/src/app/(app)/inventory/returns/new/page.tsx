@@ -27,7 +27,7 @@ function AodFacts({ aod }: { aod: ReturnableAod }) {
       <Facts
         items={[
           { label: 'AOD', value: <Mono>{aod.number ?? '—'}</Mono> },
-          { label: 'Request', value: <Mono>{aod.mrn.number ?? '—'}</Mono> },
+          { label: 'MRN', value: <Mono>{aod.mrn.number ?? '—'}</Mono> },
           { label: 'Department', value: aod.department.name },
           ...(aod.customer
             ? [{ label: 'Customer', value: aod.customer.name }]
@@ -118,7 +118,7 @@ export default async function NewReturnPage({
           <SearchBox
             action={`${BASE}/new`}
             label="Find an AOD"
-            placeholder="AOD, request or job number"
+            placeholder="AOD, MRN or job number"
             defaultValue={q}
             wide
           />

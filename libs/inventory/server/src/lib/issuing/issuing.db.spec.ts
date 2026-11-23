@@ -3,7 +3,9 @@ import {
   AttachmentAccessRegistry,
   AuditService,
   EventBus,
+  InboxService,
   NumberingService,
+  PolicyService,
   type RequestContext,
 } from '@dax/platform-core';
 import { PrismaService } from '@dax/platform-db';
@@ -14,7 +16,12 @@ import { stockFigures } from '../stock-math';
 import { findMismatches } from '../stock/reconcile';
 import { StockPostingService } from '../stock/stock-posting.service';
 import { fakePolicy } from '../testing';
+import { familySearch, itemSearch } from '../item-queries';
+import { belowMinReport } from '../reports/below-min';
+import { refreshFamily } from '../supersession';
+import { BundlesService } from '../bundles/bundles.service';
 import { AodsService } from './aods.service';
+import { ensureCustomerParts } from './customer-parts';
 import { HoldsService } from './holds.service';
 import { MrnsService } from './mrns.service';
 
@@ -27,6 +34,7 @@ describe.skipIf(!url)('issuing against Postgres', { timeout: 60_000 }, () => {
   let holds: HoldsService;
   let mrns: MrnsService;
   let aods: AodsService;
+  let bundles: BundlesService;
   let departmentId: string;
   let customerId: string;
   let itemA: string;
@@ -38,7 +46,17 @@ describe.skipIf(!url)('issuing against Postgres', { timeout: 60_000 }, () => {
     'inventory.mrn.view',
     'inventory.mrn.create',
     'inventory.aod.view',
+    'inventory.aod.issue',
   ]);
+
+  const approver = {
+    ...fakePolicy(['inventory.aod.view', 'inventory.aod.approve']),
+    userId: randomUUID(),
+  };
+  const approved = async (aod: { id: string; version: number }) => {
+    const sent = await aods.submit(policy, aod.id, aod.version);
+    return aods.approve(approver, aod.id, sent.version);
+  };
 
   const token = () => randomBytes(8).toString('hex').slice(0, 12);
   const letters = (n: number) =>
@@ -93,6 +111,7 @@ describe.skipIf(!url)('issuing against Postgres', { timeout: 60_000 }, () => {
     const context = { get: () => ({}) } as unknown as RequestContext;
     const store = new MainStore(prisma);
     const audit = new AuditService(prisma, context, [...INVENTORY_ENTITIES]);
+    bundles = new BundlesService(prisma, audit);
     const numbering = new NumberingService();
     engine = new StockPostingService(store, context);
     holds = new HoldsService(prisma, audit, numbering, engine);
@@ -106,6 +125,7 @@ describe.skipIf(!url)('issuing against Postgres', { timeout: 60_000 }, () => {
       store,
       mrns,
       new AttachmentAccessRegistry(),
+      new InboxService(prisma, new PolicyService(prisma)),
     );
     const series: [string, string][] = [
       ['HLD', ''],
@@ -246,7 +266,8 @@ describe.skipIf(!url)('issuing against Postgres', { timeout: 60_000 }, () => {
     expect(aod.lines.map((l) => [l.qty, l.bin?.id, l.reservedForLine])).toEqual(
       [['4', binA, '4']],
     );
-    const issued = await aods.issue(policy, aod.id, aod.version);
+    const ok = await approved(aod);
+    const issued = await aods.issue(policy, aod.id, ok.version);
     expect(issued.status).toBe('ISSUED');
     expect(issued.number).toMatch(/^AOD\/SER\/\d{2}\/\d{4}$/);
     expect(await figures(itemA)).toMatchObject({
@@ -347,7 +368,9 @@ describe.skipIf(!url)('issuing against Postgres', { timeout: 60_000 }, () => {
 
   it('lets only one of two pickers issue the same reserved stock', async () => {
     const mrn = await readyMrn(itemA, '1');
-    const aod = await aods.create(policy, { mrnId: mrn.id, type: 'SER' });
+    const aod = await approved(
+      await aods.create(policy, { mrnId: mrn.id, type: 'SER' }),
+    );
     const results = await Promise.allSettled([
       aods.issue(policy, aod.id, aod.version),
       aods.issue(policy, aod.id, aod.version),
@@ -364,6 +387,357 @@ describe.skipIf(!url)('issuing against Postgres', { timeout: 60_000 }, () => {
       where: { docType: 'AOD', docId: aod.id },
     });
     expect(ledger).toHaveLength(1);
+  });
+
+  it('keeps an AOD with Stores until a department head approves it', async () => {
+    const mrn = await readyMrn(itemA, '1');
+    const viewer = {
+      ...fakePolicy(['inventory.aod.view', 'inventory.mrn.view']),
+      userId: randomUUID(),
+    };
+    const aod = await aods.create(policy, { mrnId: mrn.id, type: 'SER' });
+    expect(aod.lines[0]?.customerPartNo).toBeNull();
+    expect(await failure(aods.detail(viewer, aod.id))).toMatchObject({
+      status: 404,
+    });
+    expect((await mrns.detail(viewer, mrn.id)).aods).toEqual([]);
+    expect(
+      await failure(aods.issue(policy, aod.id, aod.version)),
+    ).toMatchObject({ response: { code: 'INVALID_STATE' } });
+
+    const sent = await aods.submit(policy, aod.id, aod.version);
+    expect(sent.status).toBe('PENDING_APPROVAL');
+    expect((await aods.detail(approver, aod.id)).canApprove).toBe(true);
+
+    const rejected = await aods.reject(approver, aod.id, {
+      version: sent.version,
+      reason: 'Wrong vehicle number',
+    });
+    expect(rejected.status).toBe('PICKING');
+    expect(rejected.rejectReason).toBe('Wrong vehicle number');
+    expect(await failure(aods.detail(viewer, aod.id))).toMatchObject({
+      status: 404,
+    });
+
+    const again = await aods.submit(policy, aod.id, rejected.version);
+    expect(again.rejectReason).toBeNull();
+    const sender = { ...approver, userId: policy.userId };
+    const ok = await aods.approve(sender, aod.id, again.version);
+    expect(ok.status).toBe('APPROVED');
+    expect(ok.approved).not.toBeNull();
+    expect((await aods.detail(viewer, aod.id)).status).toBe('APPROVED');
+    expect(await failure(aods.pdf(policy, aod.id))).toMatchObject({
+      response: { code: 'NOT_ISSUED' },
+    });
+
+    const issued = await aods.issue(policy, aod.id, ok.version);
+    expect(issued.status).toBe('ISSUED');
+    const { pdf } = await aods.pdf(policy, aod.id);
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+  });
+
+  it('generates one customer part number per customer per part and finds AODs by it', async () => {
+    const customer = async (label: string) =>
+      prisma.customer.create({
+        data: {
+          code: `CP${label}-${token().slice(0, 4).toUpperCase()}`,
+          name: `Numbering ${label}`,
+          createdBy: ACTOR,
+          updatedBy: ACTOR,
+        },
+      });
+    const first = await customer('A');
+    const second = await customer('B');
+
+    const both = await prisma.$transaction((tx) =>
+      ensureCustomerParts(tx, first.id, [itemA, itemB], ACTOR),
+    );
+    expect([...both.values()].sort()).toEqual([
+      `${first.code}-00001`,
+      `${first.code}-00002`,
+    ]);
+    const again = await prisma.$transaction((tx) =>
+      ensureCustomerParts(tx, first.id, [itemA], ACTOR),
+    );
+    expect(again.get(itemA)).toBe(both.get(itemA));
+
+    const raced = await Promise.all([
+      prisma.$transaction((tx) =>
+        ensureCustomerParts(tx, second.id, [itemA], ACTOR),
+      ),
+      prisma.$transaction((tx) =>
+        ensureCustomerParts(tx, second.id, [itemB], ACTOR),
+      ),
+    ]);
+    expect([raced[0].get(itemA), raced[1].get(itemB)].sort()).toEqual([
+      `${second.code}-00001`,
+      `${second.code}-00002`,
+    ]);
+
+    const draft = await mrns.create(policy, {
+      subtype: 'PRT',
+      departmentId,
+      customerId: first.id,
+      lines: [{ itemId: itemA, qty: '1' }],
+    });
+    const submitted = await mrns.submit(policy, draft.id, draft.version);
+    await mrns.check(policy, draft.id, submitted.version);
+    const aod = await aods.create(policy, { mrnId: draft.id, type: 'DIR' });
+    expect(aod.lines.map((l) => l.customerPartNo)).toEqual([both.get(itemA)]);
+
+    const found = await aods.list(policy, {
+      q: both.get(itemA),
+      status: 'ALL',
+      page: 1,
+      limit: 25,
+    });
+    expect(found.items.map((a) => a.id)).toEqual([aod.id]);
+    const items = await prisma.item.findMany({
+      where: itemSearch(both.get(itemA)),
+      select: { id: true },
+    });
+    expect(items.map((i) => i.id)).toEqual([itemA]);
+
+    const open = await mrns.detail(policy, draft.id);
+    await mrns.cancel(policy, draft.id, open.version);
+  });
+
+  it('pools stock across superseded numbers, oldest first, and supplies the old number', async () => {
+    const base = await prisma.item.findUniqueOrThrow({
+      where: { id: itemA },
+      select: { brandId: true },
+    });
+    const code = letters(4);
+    const part = (n: string) =>
+      prisma.item.create({
+        data: {
+          partNo: `F${n}-${code}`,
+          partNoNorm: `F${n}${code}`,
+          brandId: base.brandId,
+          description: 'Family test part',
+          uom: 'PCS',
+          defaultBinId: binA,
+          qrToken: token(),
+          createdBy: ACTOR,
+          updatedBy: ACTOR,
+        },
+      });
+    const oldest = await part('0739');
+    const older = await part('0750');
+    const current = await part('1808');
+    const branch = await part('0740');
+    expect(current.familyId).toBe(current.id);
+    const supersede = async (id: string, by: string) => {
+      await prisma.item.update({
+        where: { id },
+        data: { supersededById: by },
+      });
+      await prisma.$transaction((tx) => refreshFamily(tx, id));
+    };
+    await supersede(older.id, current.id);
+    await supersede(oldest.id, older.id);
+    await supersede(branch.id, older.id);
+    const fam = await prisma.item.findMany({
+      where: { id: { in: [oldest.id, older.id, current.id, branch.id] } },
+      select: { id: true, familyId: true, familyDepth: true },
+    });
+    expect(
+      Object.fromEntries(fam.map((f) => [f.id, [f.familyId, f.familyDepth]])),
+    ).toEqual({
+      [oldest.id]: [current.id, 2],
+      [branch.id]: [current.id, 2],
+      [older.id]: [current.id, 1],
+      [current.id]: [current.id, 0],
+    });
+
+    await receive(oldest.id, '4');
+    await receive(older.id, '3');
+    await receive(current.id, '7');
+
+    const listed = await prisma.item.findMany({
+      where: { AND: [{ supersededById: null }, familySearch(oldest.partNo)] },
+      select: { id: true },
+    });
+    expect(listed.map((i) => i.id)).toEqual([current.id]);
+    const low = await belowMinReport(
+      prisma,
+      (await prisma.store.findUniqueOrThrow({ where: { code: 'MAIN' } })).id,
+      2000,
+    );
+    expect(low.items.some((r) => r.item.id === older.id)).toBe(false);
+
+    const draft = await mrns.create(policy, {
+      subtype: 'PRT',
+      departmentId,
+      lines: [{ itemId: current.id, qty: '9' }],
+    });
+    const submitted = await mrns.submit(policy, draft.id, draft.version);
+    const checked = await mrns.check(policy, draft.id, submitted.version);
+    const [line] = checked.lines;
+    expect(line?.qtyReserved).toBe('9');
+    expect(line?.freeNow).toBe('5');
+    expect(line?.reservedBy.map((r) => [r.item.id, r.qty])).toEqual([
+      [oldest.id, '4'],
+      [older.id, '3'],
+      [current.id, '2'],
+    ]);
+
+    const aod = await aods.create(policy, { mrnId: draft.id, type: 'SER' });
+    expect(
+      aod.lines.map((l) => [l.item.id, l.qty, l.requestedItem?.id ?? null]),
+    ).toEqual([
+      [oldest.id, '4', current.id],
+      [older.id, '3', current.id],
+      [current.id, '2', null],
+    ]);
+    const wrong = await failure(
+      aods.update(policy, aod.id, {
+        version: aod.version,
+        lines: aod.lines.map((l) => ({
+          id: l.id,
+          mrnLineId: l.mrnLineId,
+          itemId: l.item.id === oldest.id ? branch.id : l.item.id,
+          binId: binA,
+          qty: l.qty,
+          scanned: false,
+        })),
+      }),
+    );
+    expect(wrong.response?.code).toBe('MORE_THAN_RESERVED');
+
+    const ok = await approved(aod);
+    await aods.issue(policy, aod.id, ok.version);
+    expect(await figures(oldest.id)).toMatchObject({ onHand: '0', held: '0' });
+    expect(await figures(older.id)).toMatchObject({ onHand: '0', held: '0' });
+    expect(await figures(current.id)).toMatchObject({ onHand: '5', held: '0' });
+    const { pdf } = await aods.pdf(policy, aod.id);
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+
+    await prisma.item.update({
+      where: { id: older.id },
+      data: { supersededById: null },
+    });
+    await prisma.$transaction((tx) => refreshFamily(tx, older.id));
+    const split = await prisma.item.findMany({
+      where: { id: { in: [oldest.id, older.id] } },
+      select: { familyId: true },
+    });
+    expect(split.map((f) => f.familyId)).toEqual([older.id, older.id]);
+  });
+
+  it('ships a bundle in whole sets and numbers it for the customer', async () => {
+    const base = await prisma.item.findUniqueOrThrow({
+      where: { id: itemA },
+      select: { brandId: true },
+    });
+    const code = letters(4);
+    const part = (n: string) =>
+      prisma.item.create({
+        data: {
+          partNo: `K${n}-${code}`,
+          partNoNorm: `K${n}${code}`,
+          brandId: base.brandId,
+          description: `Kit part ${n}`,
+          uom: 'PCS',
+          defaultBinId: binA,
+          qrToken: token(),
+          createdBy: ACTOR,
+          updatedBy: ACTOR,
+        },
+      });
+    const filter = await part('1');
+    const seal = await part('2');
+    await receive(filter.id, '5');
+    await receive(seal.id, '1');
+    const customer = await prisma.customer.create({
+      data: {
+        code: `KB-${code}`,
+        name: `Kit customer ${code}`,
+        createdBy: ACTOR,
+        updatedBy: ACTOR,
+      },
+    });
+    const kit = await bundles.create(ACTOR, {
+      name: `Service kit ${code}`,
+      lines: [
+        { itemId: filter.id, qty: '2' },
+        { itemId: seal.id, qty: '1' },
+      ],
+    });
+    expect(kit.partCount).toBe(2);
+
+    const raise = async (bundleId: string | null, name: string) => {
+      const draft = await mrns.create(policy, {
+        subtype: 'PRT',
+        departmentId,
+        customerId: customer.id,
+        lines: [],
+        bundles: [
+          {
+            bundleId,
+            name,
+            qtySets: 2,
+            lines: [
+              { itemId: filter.id, qtyPerSet: '2' },
+              { itemId: seal.id, qtyPerSet: '1' },
+            ],
+          },
+        ],
+      });
+      const sent = await mrns.submit(policy, draft.id, draft.version);
+      return mrns.check(policy, draft.id, sent.version);
+    };
+
+    const mrn = await raise(kit.id, kit.name);
+    expect(mrn.lines.map((l) => [l.qtyRequested, l.qtyReserved])).toEqual([
+      ['4', '4'],
+      ['2', '1'],
+    ]);
+    expect(mrn.bundles[0]).toMatchObject({ qtySets: 2, setsReady: 1 });
+
+    const aod = await aods.create(policy, { mrnId: mrn.id, type: 'DIR' });
+    expect(aod.lines.map((l) => l.qty)).toEqual(['2', '1']);
+    expect(aod.bundles).toEqual([
+      expect.objectContaining({ sets: 1, customerPartNo: `KB-${code}-00003` }),
+    ]);
+    const partial = await failure(
+      aods.update(policy, aod.id, {
+        version: aod.version,
+        lines: aod.lines.map((l) => ({
+          id: l.id,
+          mrnLineId: l.mrnLineId,
+          itemId: l.item.id,
+          binId: binA,
+          qty: l.item.id === filter.id ? '1' : l.qty,
+          scanned: false,
+        })),
+      }),
+    );
+    expect(partial.response?.code).toBe('BUNDLE_INCOMPLETE');
+
+    const ok = await approved(aod);
+    await aods.issue(policy, aod.id, ok.version);
+    const byKit = await aods.list(policy, {
+      q: `KB-${code}-00003`,
+      status: 'ALL',
+      page: 1,
+      limit: 25,
+    });
+    expect(byKit.items.map((a) => a.id)).toEqual([aod.id]);
+    const { pdf } = await aods.pdf(policy, aod.id, 'customer');
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+
+    await receive(filter.id, '6');
+    await receive(seal.id, '4');
+    const again = await raise(kit.id, kit.name);
+    const second = await aods.create(policy, { mrnId: again.id, type: 'DIR' });
+    expect(second.bundles[0]?.customerPartNo).toBe(`KB-${code}-00003`);
+
+    await receive(filter.id, '4');
+    await receive(seal.id, '2');
+    const oneOff = await raise(null, 'One-off set');
+    const third = await aods.create(policy, { mrnId: oneOff.id, type: 'DIR' });
+    expect(third.bundles[0]?.customerPartNo).toBe(`KB-${code}-00004`);
   });
 
   it('agrees with the nightly reconciliation', async () => {

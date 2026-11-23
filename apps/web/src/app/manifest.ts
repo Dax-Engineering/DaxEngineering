@@ -21,8 +21,8 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: 'Scan', short_name: 'Scan', url: '/scan', icons: SHORTCUT_ICON },
       {
-        name: 'Receive a delivery',
-        short_name: 'Receive',
+        name: 'Raise GRN',
+        short_name: 'GRN',
         url: '/inventory/receiving/grns/new',
         icons: SHORTCUT_ICON,
       },

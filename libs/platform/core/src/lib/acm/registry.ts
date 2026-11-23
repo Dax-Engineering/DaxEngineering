@@ -76,13 +76,19 @@ export function defaultGrantsFor(
   const out: { roleKey: string; permissionKey: string; scope: GrantScope }[] =
     [];
   for (const [roleKey, grants] of Object.entries(m.defaultGrants ?? {})) {
+    const withheld = new Set(
+      Object.entries(grants)
+        .filter(([, wanted]) => wanted === null)
+        .map(([target]) => `${m.key}.${target}`),
+    );
     for (const [target, wanted] of Object.entries(grants)) {
+      if (wanted === null) continue;
       const targets =
         target === '*'
           ? rows
           : rows.filter((r) => r.key === `${m.key}.${target}`);
       for (const row of targets) {
-        if (!newKeys.has(row.key)) continue;
+        if (!newKeys.has(row.key) || withheld.has(row.key)) continue;
         const fits = row.scopes.filter(
           (s) => SCOPE_RANK[s] <= SCOPE_RANK[wanted],
         );

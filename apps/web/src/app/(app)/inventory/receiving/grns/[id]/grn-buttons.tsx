@@ -54,7 +54,7 @@ export function PostGrnButton({
         centered
       >
         <Stack>
-          <Text size="sm">Posting brings the delivery into stock:</Text>
+          <Text size="sm">Posting the GRN brings the delivery into stock:</Text>
           <List size="sm" spacing={6}>
             <ListItem>
               The GRN gets its number, for example GRN/FOR/26/0001.

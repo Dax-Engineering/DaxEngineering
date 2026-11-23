@@ -11,40 +11,21 @@ import {
   REPORT_CSV_ROW_LIMIT,
   REPORT_MOVEMENT_LABELS,
   REPORT_ROW_LIMIT,
-  type SlowMovingQuery,
-  type SlowMovingReport,
 } from '@dax/inventory-contract';
 import { pageMeta, pageWindow } from '@dax/contracts';
 import { Prisma, PrismaService } from '@dax/platform-db';
 import { MainStore } from '../main-store.service';
+import { belowMinReport } from './below-min';
 import { userNames } from '../receiving/shared';
 import { qtyString } from '../stock-math';
 import {
   colomboDateTime,
   colomboDay,
   colomboRange,
-  daysSince,
-  freeOf,
-  shortBy,
-  slowMovingCutoff,
   toCsv,
 } from './report-math';
 
 type Decimalish = Prisma.Decimal | string | number;
-
-interface BelowMinSql {
-  id: string;
-  part_no: string;
-  brand: string;
-  description: string;
-  uom: string;
-  min_qty: Decimalish;
-  on_hand: Decimalish;
-  held: Decimalish;
-  quarantine: Decimalish;
-  receiving: Decimalish;
-  waiting: Decimalish;
-}
 
 interface BinStockSql {
   bin_id: string;
@@ -60,17 +41,6 @@ interface BinStockSql {
   description: string;
   uom: string;
   qty: Decimalish;
-}
-
-interface SlowMovingSql {
-  id: string;
-  part_no: string;
-  brand: string;
-  description: string;
-  uom: string;
-  on_hand: Decimalish;
-  last_issued_at: Date | null;
-  last_received_at: Date | null;
 }
 
 const LEDGER_SELECT = {
@@ -124,53 +94,7 @@ export class ReportsService {
   ) {}
 
   async belowMin(limit = REPORT_ROW_LIMIT): Promise<BelowMinReport> {
-    const storeId = await this.store.id();
-    const rows = await this.prisma.$queryRaw<BelowMinSql[]>`
-      WITH waiting AS (
-        SELECT l.item_id,
-          SUM(GREATEST(l.qty_requested - l.qty_issued - l.qty_short_closed - COALESCE(r.qty, 0), 0)) AS qty
-        FROM inventory.mrn_line l
-        JOIN inventory.mrn m ON m.id = l.mrn_id
-        LEFT JOIN inventory.reservation r ON r.source = 'MRN' AND r.source_line_id = l.id
-        WHERE m.status IN ('CHECKED', 'READY', 'PARTLY_ISSUED')
-        GROUP BY l.item_id
-      ), stock AS (
-        SELECT i.id, i.part_no, br.name AS brand, i.description, i.uom, i.min_qty,
-          COALESCE(b.on_hand, 0) AS on_hand, COALESCE(b.held, 0) AS held,
-          COALESCE(b.quarantine, 0) AS quarantine, COALESCE(b.receiving, 0) AS receiving,
-          COALESCE(w.qty, 0) AS waiting
-        FROM inventory.item i
-        JOIN inventory.brand br ON br.id = i.brand_id
-        LEFT JOIN inventory.stock_balance b ON b.item_id = i.id AND b.store_id = ${storeId}::uuid
-        LEFT JOIN waiting w ON w.item_id = i.id
-        WHERE i.status = 'ACTIVE' AND i.min_qty > 0
-      )
-      SELECT id::text AS id, part_no, brand, description, uom, min_qty,
-        on_hand, held, quarantine, receiving, waiting
-      FROM stock
-      WHERE on_hand - held - quarantine - receiving < min_qty
-      ORDER BY min_qty - (on_hand - held - quarantine - receiving) DESC, part_no, id
-      LIMIT ${limit + 1}`;
-    return {
-      items: rows.slice(0, limit).map((r) => {
-        const free = freeOf({
-          onHand: r.on_hand,
-          held: r.held,
-          quarantine: r.quarantine,
-          receiving: r.receiving,
-        });
-        return {
-          item: itemOf(r.id, r),
-          minQty: qtyString(r.min_qty),
-          onHand: qtyString(r.on_hand),
-          held: qtyString(r.held),
-          free: qtyString(free),
-          shortBy: qtyString(shortBy(r.min_qty, free)),
-          waiting: qtyString(r.waiting),
-        };
-      }),
-      truncated: rows.length > limit,
-    };
+    return belowMinReport(this.prisma, await this.store.id(), limit);
   }
 
   async belowMinCsv(): Promise<CsvFile> {
@@ -201,7 +125,7 @@ export class ReportsService {
           'Held',
           'Free',
           'Short by',
-          'Waiting on requests',
+          'Waiting on MRNs',
         ],
         rows,
       ),
@@ -428,79 +352,6 @@ export class ReportsService {
           'Description',
           'Quantity',
           'Unit',
-        ],
-        rows,
-      ),
-    };
-  }
-
-  async slowMoving(
-    query: SlowMovingQuery,
-    limit = REPORT_ROW_LIMIT,
-    now = new Date(),
-  ): Promise<SlowMovingReport> {
-    const storeId = await this.store.id();
-    const cutoff = slowMovingCutoff(Number(query.days), now);
-    const rows = await this.prisma.$queryRaw<SlowMovingSql[]>`
-      SELECT i.id::text AS id, i.part_no, br.name AS brand, i.description, i.uom,
-        b.on_hand, li.at AS last_issued_at, lr.at AS last_received_at
-      FROM inventory.stock_balance b
-      JOIN inventory.item i ON i.id = b.item_id
-      JOIN inventory.brand br ON br.id = i.brand_id
-      LEFT JOIN LATERAL (
-        SELECT MAX(l.occurred_at) AS at FROM inventory.stock_ledger l
-        WHERE l.item_id = b.item_id AND l.store_id = b.store_id AND l.movement = 'ISSUE'
-      ) li ON true
-      LEFT JOIN LATERAL (
-        SELECT MAX(l.occurred_at) AS at FROM inventory.stock_ledger l
-        WHERE l.item_id = b.item_id AND l.store_id = b.store_id
-          AND l.movement IN ('RECEIVE', 'RECEIVE_DAMAGED')
-      ) lr ON true
-      WHERE b.store_id = ${storeId}::uuid AND b.on_hand > 0
-        AND (li.at IS NULL OR li.at < ${cutoff})
-      ORDER BY li.at ASC NULLS FIRST, i.part_no, i.id
-      LIMIT ${limit + 1}`;
-    return {
-      items: rows.slice(0, limit).map((r) => ({
-        item: itemOf(r.id, r),
-        onHand: qtyString(r.on_hand),
-        lastIssuedAt: r.last_issued_at?.toISOString() ?? null,
-        lastReceivedAt: r.last_received_at?.toISOString() ?? null,
-        daysSinceIssue: r.last_issued_at
-          ? daysSince(r.last_issued_at, now)
-          : null,
-      })),
-      truncated: rows.length > limit,
-    };
-  }
-
-  async slowMovingCsv(query: SlowMovingQuery): Promise<CsvFile> {
-    const report = await this.slowMoving(query, REPORT_CSV_ROW_LIMIT);
-    const day = (iso: string | null) =>
-      iso ? colomboDay(new Date(iso)) : null;
-    const rows: (string | number | null)[][] = report.items.map((r) => [
-      r.item.partNo,
-      r.item.brand,
-      r.item.description,
-      r.onHand,
-      r.item.uom,
-      day(r.lastIssuedAt) ?? 'Never issued',
-      day(r.lastReceivedAt),
-      r.daysSinceIssue,
-    ]);
-    if (report.truncated) rows.push([TRUNCATED_NOTE]);
-    return {
-      name: csvName(`no-issue-${query.days}-days`),
-      text: toCsv(
-        [
-          'Part number',
-          'Brand',
-          'Description',
-          'On hand',
-          'Unit',
-          'Last issued',
-          'Last received',
-          'Days since last issue',
         ],
         rows,
       ),

@@ -242,7 +242,7 @@ export function PhoneScanner({ initial }: { initial: PhoneScanState }) {
     ? 'Point the camera at a barcode. Each scan adds 1 on the PC.'
     : state.status === 'ENDED' || state.status === 'LOCKED'
       ? 'Session ended. On the PC press "New code", then scan it.'
-      : 'On the PC open "Scan with phone", then point the camera at its QR code.';
+      : 'On the PC press Scan, then Scan with External Phone, and point the camera at its QR code.';
 
   const ended = state.status === 'ENDED' || state.status === 'LOCKED';
 
@@ -354,7 +354,8 @@ export function PhoneScanner({ initial }: { initial: PhoneScanState }) {
                 <div>
                   <b>On the PC</b>
                   <small>
-                    Open Stores, press <em>Scan with phone</em>
+                    Open Stores, press <em>Scan</em>, then{' '}
+                    <em>Scan with External Phone</em>
                     {ended ? ', then New code' : ''}.
                   </small>
                 </div>

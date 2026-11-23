@@ -39,7 +39,8 @@ export function daysSince(at: Date, now: Date): number {
   return dayNumber(now) - dayNumber(at);
 }
 
-export function slowMovingCutoff(days: number, now: Date): Date {
+/** Anything that arrived before this is at least `days` Colombo calendar days old. */
+export function daysOldCutoff(days: number, now: Date): Date {
   return new Date(
     colomboDayStart(colomboDay(now)).getTime() - (days - 1) * DAY_MS,
   );

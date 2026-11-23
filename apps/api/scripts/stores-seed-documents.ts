@@ -12,8 +12,10 @@ import {
   AuditService,
   type EntityDef,
   EventBus,
+  InboxService,
   NumberingService,
   type Policy,
+  PolicyService,
   type RequestContext,
 } from '@dax/platform-core';
 import type { PrismaService } from '@dax/platform-db';
@@ -27,6 +29,7 @@ import { PutawayService } from '../../../libs/inventory/server/src/lib/receiving
 import { ReturnsService } from '../../../libs/inventory/server/src/lib/returns/returns.service';
 import { WarrantyService } from '../../../libs/inventory/server/src/lib/warranty/warranty.service';
 /* eslint-enable @nx/enforce-module-boundaries */
+import { seedBundles } from './stores-seed-bundles';
 
 export interface DocumentDeps {
   prisma: PrismaService;
@@ -59,7 +62,14 @@ export async function seedDocuments(
     store,
     mrns,
     attachments,
+    new InboxService(prisma, new PolicyService(prisma)),
   );
+  /** Sends an AOD for approval, approves it and issues it, as Stores and a department head would. */
+  const issueAod = async (picked: { id: string; version: number }) => {
+    const sent = await aods.submit(keeper, picked.id, picked.version);
+    const approved = await aods.approve(keeper, picked.id, sent.version);
+    return aods.issue(keeper, picked.id, approved.version);
+  };
   const grns = new GrnsService(prisma, audit, numbering, events, engine, store);
   const putaway = new PutawayService(prisma, audit, events, engine, store);
   const warranty = new WarrantyService(
@@ -324,8 +334,10 @@ export async function seedDocuments(
     deliverTo: 'Ruhuna Hospital, generator house',
     vehicleNo: 'SP KD-2290',
   });
-  aod = await aods.issue(keeper, aod.id, aod.version);
-  summary.push(`AOD ${aod.number}: issued, awaiting signature`);
+  aod = await issueAod(aod);
+  summary.push(
+    `AOD ${aod.number}: issued, awaiting signature (1R-0750 supplied partly as 1R-0750-OLD)`,
+  );
 
   // Issued and signed, so the request closes. Its parts come back below.
   mrn = await submitAndCheck(
@@ -341,7 +353,7 @@ export async function seedDocuments(
     deliverTo: 'Hill Country Estates, factory',
     vehicleNo: 'CP HA-8812',
   });
-  signed = await aods.issue(keeper, signed.id, signed.version);
+  signed = await issueAod(signed);
   // Only the file record is seeded; there is no real scanned copy to download.
   const file = await prisma.attachment.create({
     data: {
@@ -363,6 +375,11 @@ export async function seedDocuments(
     attachmentId: file.id,
   });
   summary.push(`AOD ${signed.number}: signed (request closed)`);
+
+  console.log('Bundles');
+  summary.push(
+    ...(await seedBundles({ prisma, keeper, audit, mrns, aods, departmentId })),
+  );
 
   // ------------------------------------------------------- Returns, warranty
   console.log('Returns and warranty');

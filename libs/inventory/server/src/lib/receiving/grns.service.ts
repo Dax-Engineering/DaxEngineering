@@ -55,6 +55,7 @@ import {
   toItemRef,
   userNames,
 } from './shared';
+import { makeGrnSerials, voidSerials } from './serials';
 
 const SUMMARY_SELECT = {
   id: true,
@@ -217,6 +218,20 @@ export class GrnsService {
       row.reversedBy,
     ]);
     const reversed = stampOf(row.reversedBy, row.reversedAt, names);
+    const serials = await this.prisma.itemSerial.findMany({
+      where: { docLineId: { in: row.lines.map((l) => l.id) } },
+      orderBy: [{ condition: 'asc' }, { unitNo: 'asc' }],
+      select: {
+        id: true,
+        serial: true,
+        docLineId: true,
+        unitNo: true,
+        qty: true,
+        condition: true,
+        status: true,
+        printCount: true,
+      },
+    });
     return {
       ...toSummary(row),
       deliveryNote: row.deliveryNote,
@@ -238,6 +253,17 @@ export class GrnsService {
         wrongItem: l.wrongItem,
         notes: l.notes,
         defaultBin: l.item.defaultBin,
+        serials: serials
+          .filter((s) => s.docLineId === l.id)
+          .map((s) => ({
+            id: s.id,
+            serial: s.serial,
+            unitNo: s.unitNo,
+            qty: qtyString(s.qty),
+            condition: s.condition,
+            status: s.status,
+            printCount: s.printCount,
+          })),
       })),
       discrepancies: row.discrepancies.map((d) => ({
         id: d.id,
@@ -449,7 +475,21 @@ export class GrnsService {
         select: {
           subtype: true,
           supplierId: true,
-          lines: { select: EDIT_LINE_SELECT, orderBy: { lineNo: 'asc' } },
+          supplierName: true,
+          lines: {
+            select: {
+              ...EDIT_LINE_SELECT,
+              lineNo: true,
+              item: {
+                select: {
+                  partNo: true,
+                  uom: true,
+                  brand: { select: { name: true } },
+                },
+              },
+            },
+            orderBy: { lineNo: 'asc' },
+          },
         },
       });
       if (!hasSomethingReceived(grn.lines)) {
@@ -499,6 +539,29 @@ export class GrnsService {
         ].filter((m) => m.qty.gt(0));
       });
       await this.stock.post(tx, movements, policy.userId);
+      await makeGrnSerials(
+        tx,
+        {
+          id,
+          number,
+          supplierName: grn.supplierName,
+          receivedAt: now,
+          receivingBinId: bins.receiving,
+          quarantineBinId: bins.quarantine,
+        },
+        lines.map((l) => ({
+          id: l.id,
+          lineNo: l.lineNo,
+          qtyGood: l.qtyGood,
+          qtyDamaged: l.qtyDamaged,
+          item: {
+            id: l.itemId,
+            partNo: l.item.partNo,
+            brand: l.item.brand.name,
+            uom: l.item.uom,
+          },
+        })),
+      );
 
       const discrepancies = lines.flatMap((l) =>
         lineDiscrepancies(l).map((d) => ({
@@ -637,6 +700,7 @@ export class GrnsService {
         throw error;
       }
 
+      await voidSerials(tx, id, now);
       const closed = await tx.discrepancy.updateMany({
         where: { grnId: id, status: 'OPEN' },
         data: {

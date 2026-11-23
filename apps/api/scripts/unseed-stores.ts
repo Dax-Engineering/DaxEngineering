@@ -128,7 +128,7 @@ const BLOCKERS: [label: string, sql: string][] = [
   ],
   [
     'other items using a seeded bin or part',
-    `SELECT count(*) FROM inventory.item WHERE id NOT IN (SELECT id FROM seed_item) AND (default_bin_id IN (SELECT id FROM seed_bin) OR superseded_by_id IN (SELECT id FROM seed_item))`,
+    `SELECT count(*) FROM inventory.item WHERE id NOT IN (SELECT id FROM seed_item) AND (default_bin_id IN (SELECT id FROM seed_bin) OR superseded_by_id IN (SELECT id FROM seed_item) OR family_id IN (SELECT id FROM seed_item))`,
   ],
 ];
 
@@ -200,6 +200,38 @@ const DELETES: [label: string, sql: string][] = [
   [
     'stock balances',
     `DELETE FROM inventory.stock_balance WHERE item_id IN (SELECT id FROM seed_item)`,
+  ],
+  [
+    'low-stock alerts',
+    `DELETE FROM inventory.low_stock_alert WHERE item_id IN (SELECT id FROM seed_item)`,
+  ],
+  [
+    'serial numbers',
+    `DELETE FROM inventory.item_serial WHERE item_id IN (SELECT id FROM seed_item) OR doc_id IN (SELECT id FROM seed_grn)`,
+  ],
+  [
+    'stock age layers',
+    `DELETE FROM inventory.stock_layer WHERE item_id IN (SELECT id FROM seed_item)`,
+  ],
+  [
+    'customer part numbers',
+    `DELETE FROM inventory.customer_part WHERE item_id IN (SELECT id FROM seed_item) OR customer_id IN (SELECT id FROM seed_customer)`,
+  ],
+  [
+    'customer bundle numbers',
+    `DELETE FROM inventory.customer_bundle_part WHERE customer_id IN (SELECT id FROM seed_customer) OR bundle_id IN (SELECT id FROM inventory.bundle WHERE created_by = ANY($1::uuid[]))`,
+  ],
+  [
+    'customer part counters',
+    `DELETE FROM inventory.customer_part_counter c WHERE customer_id IN (SELECT id FROM seed_customer)`,
+  ],
+  [
+    'bundles',
+    `DELETE FROM inventory.bundle WHERE created_by = ANY($1::uuid[])`,
+  ],
+  [
+    'part families',
+    `UPDATE inventory.item SET superseded_by_id = NULL, family_id = id, family_depth = 0 WHERE id IN (SELECT id FROM seed_item)`,
   ],
   [
     'items',

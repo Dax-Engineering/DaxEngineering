@@ -42,13 +42,11 @@ export default async function GrnListPage({
       <PageHead
         back={{ href: BASE, label: 'Receiving' }}
         eyebrow="Receiving"
-        title="Goods received"
+        title="GRNs"
         lede="Drafts are counted at the dock. Posting assigns the GRN number and brings the stock in."
         actions={
           canDo(caps, 'inventory.grn.check') ? (
-            <LinkButton href={`${BASE}/grns/new`}>
-              Receive a delivery
-            </LinkButton>
+            <LinkButton href={`${BASE}/grns/new`}>Raise GRN</LinkButton>
           ) : null
         }
       />
@@ -85,7 +83,7 @@ export default async function GrnListPage({
             <Empty title="No GRNs found">
               {filtered
                 ? 'Try a different search or filter.'
-                : 'Receive a delivery to start one.'}
+                : 'Raise a GRN when a delivery arrives.'}
             </Empty>
           </CardBody>
         ) : (

@@ -10,10 +10,10 @@ export default async function ReceiveDeliveryPage() {
       <PageHead
         back={{ href: BASE, label: 'Receiving' }}
         eyebrow="Receiving"
-        title="Receive a delivery"
+        title="Raise GRN"
         lede="Start a draft GRN, then count each part at the dock."
       />
-      <SectionCard title="Delivery">
+      <SectionCard title="GRN details">
         <WalkInForm />
       </SectionCard>
     </>

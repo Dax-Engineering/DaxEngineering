@@ -6,6 +6,7 @@ import { z } from 'zod';
 import {
   AodCreate,
   AodDto,
+  AodReject,
   AodSign,
   AodUpdate,
   BinDetail,
@@ -32,12 +33,14 @@ import type { CodeMatch } from './types';
 
 const CODES: Record<string, string> = {
   STALE: 'Someone else changed this. Reload.',
+  OUT_OF_SCOPE: 'This AOD is for a department you do not approve for.',
+  NOT_ISSUED: 'Approve and issue the AOD before printing it.',
   INVALID_STATE:
     'This has moved on since you opened it. Reload to see where it is now.',
   NOT_ENOUGH_FREE_STOCK:
     'There is not enough free stock for that any more. Reload to see what is free now.',
   NOT_RESERVED:
-    'More is being picked than is reserved for this request. Lower the quantity.',
+    'More is being picked than is reserved for this MRN. Lower the quantity.',
   INSUFFICIENT_STOCK:
     'A bin does not hold that much of the part. Pick from another bin or lower the quantity.',
   NUMBER_SERIES_UNAVAILABLE:
@@ -139,7 +142,7 @@ export async function saveMrn(
     }
   } catch (error) {
     refresh();
-    return failure(error, 'Could not save the request.', CODES);
+    return failure(error, 'Could not save the MRN.', CODES);
   }
   refresh();
   if (!id) redirect(mrnPath(target));
@@ -155,7 +158,7 @@ const MrnStep = z.object({
 const MRN_DONE = {
   submit: 'Submitted for checking.',
   check: 'Checked. Free stock is reserved; anything short is waiting.',
-  cancel: 'Request cancelled. Its reservations are released.',
+  cancel: 'MRN cancelled. Its reservations are released.',
 } as const;
 
 export async function mrnStep(
@@ -163,7 +166,7 @@ export async function mrnStep(
   payload: z.input<typeof MrnStep>,
 ): Promise<ActionState> {
   const parsed = MrnStep.safeParse(payload);
-  if (!parsed.success) return { ok: false, error: 'Unknown request.' };
+  if (!parsed.success) return { ok: false, error: 'Unknown MRN.' };
   const { id, version, step } = parsed.data;
   try {
     await api.request(`/inventory/mrns/${id}/${step}`, () => null, {
@@ -171,7 +174,7 @@ export async function mrnStep(
       json: { version },
     });
   } catch (error) {
-    return failure(error, 'Could not update the request.', CODES);
+    return failure(error, 'Could not update the MRN.', CODES);
   }
   refresh();
   return { ok: true, message: MRN_DONE[step] };
@@ -192,7 +195,7 @@ export async function shortCloseMrn(
       json: body,
     });
   } catch (error) {
-    return failure(error, 'Could not short-close the request.', CODES);
+    return failure(error, 'Could not short-close the MRN.', CODES);
   }
   refresh();
   return { ok: true, message: 'Short-closed. Waiting quantities are dropped.' };
@@ -216,7 +219,7 @@ export async function allocateMrn(
     return failure(error, 'Could not assign the stock.', CODES);
   }
   refresh();
-  return { ok: true, message: 'Stock assigned to this request.' };
+  return { ok: true, message: 'Stock assigned to this MRN.' };
 }
 
 export async function startPicking(
@@ -241,15 +244,49 @@ export async function startPicking(
 const AodCommand = z.object({
   id: z.uuid(),
   version: z.int(),
-  step: z.enum(['save', 'issue', 'cancel']),
+  step: z.enum(['save', 'submit', 'withdraw', 'approve', 'issue', 'cancel']),
   update: z.unknown().optional(),
 });
 
 const AOD_DONE = {
   save: 'Saved.',
+  submit: 'Sent for approval. Issue it once a department head approves it.',
+  withdraw: 'Taken back. Change it and send it for approval again.',
+  approve: 'Approved. Stores can now issue and print it.',
   issue: 'Issued. Print the AOD and upload the signed copy.',
-  cancel: 'Picking cancelled. The stock stays reserved for the request.',
+  cancel: 'AOD cancelled. The stock stays reserved for the MRN.',
 } as const;
+
+const AOD_FAILED = {
+  save: 'Could not save the AOD.',
+  submit: 'Could not send the AOD for approval.',
+  withdraw: 'Could not take the AOD back.',
+  approve: 'Could not approve the AOD.',
+  issue: 'Could not issue the AOD.',
+  cancel: 'Could not cancel the AOD.',
+} as const;
+
+const RejectPayload = AodReject.extend({ id: z.uuid() });
+
+export async function rejectAod(
+  _prev: ActionState,
+  payload: z.input<typeof RejectPayload>,
+): Promise<ActionState> {
+  const parsed = RejectPayload.safeParse(payload);
+  if (!parsed.success) return invalid(parsed.error);
+  const { id, ...body } = parsed.data;
+  try {
+    await api.request(`/inventory/aods/${id}/reject`, () => null, {
+      method: 'POST',
+      json: body,
+    });
+  } catch (error) {
+    refresh();
+    return failure(error, 'Could not reject the AOD.', CODES);
+  }
+  refresh();
+  return { ok: true, message: 'Rejected. It is back with Stores.' };
+}
 
 export async function aodStep(
   _prev: ActionState,
@@ -281,11 +318,7 @@ export async function aodStep(
       });
   } catch (error) {
     refresh();
-    return failure(
-      error,
-      step === 'issue' ? 'Could not issue the AOD.' : 'Could not save the AOD.',
-      CODES,
-    );
+    return failure(error, AOD_FAILED[step], CODES);
   }
   refresh();
   return { ok: true, message: AOD_DONE[step] };
@@ -399,7 +432,7 @@ export async function convertHold(
       { method: 'POST', json: body },
     ));
   } catch (error) {
-    return failure(error, 'Could not turn the hold into a request.', CODES);
+    return failure(error, 'Could not turn the hold into an MRN.', CODES);
   }
   refresh();
   redirect(mrnPath(mrnId));

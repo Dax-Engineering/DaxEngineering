@@ -28,6 +28,9 @@ import {
   type FilesOptions,
   filesProviders,
 } from './files';
+import { InboxController } from './inbox/inbox.controller';
+import { MAILER, mailerProvider } from './inbox/inbox.module';
+import { InboxService } from './inbox/inbox.service';
 import { NumberingService } from './numbering/numbering.service';
 import { PolicyService } from './acm/policy.service';
 import type { Catalog } from './acm/registry';
@@ -106,6 +109,8 @@ export class PlatformModule {
         fieldCryptoProvider(options.crypto),
         NumberingService,
         ApprovalsService,
+        InboxService,
+        mailerProvider({ resend: options.auth.resend }),
         ...filesProviders(options.files),
         ...(options.providers ?? []),
       ],
@@ -114,6 +119,7 @@ export class PlatformModule {
         DirectoryController,
         ...ADMIN_CONTROLLERS,
         AttachmentsController,
+        InboxController,
         ...(options.controllers ?? []),
       ],
       exports: [
@@ -126,6 +132,8 @@ export class PlatformModule {
         FieldCrypto,
         NumberingService,
         ApprovalsService,
+        InboxService,
+        MAILER,
         AttachmentAccessRegistry,
         FilesService,
       ],

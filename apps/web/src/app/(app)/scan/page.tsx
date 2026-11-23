@@ -1,7 +1,7 @@
+import Link from 'next/link';
 import { canDo, PageHead, SectionCard } from '@dax/web-shell';
 import { flatten, type SearchParams } from '../../../lib/query';
 import { requirePermission } from '../../../lib/server';
-import { PhonesOnly } from './phones-only';
 import { ScanClient } from './scan-client';
 
 const NOTICES: Record<string, string> = {
@@ -27,12 +27,15 @@ export default async function ScanPage({
         title="Scan"
         lede="Point the camera at a label or barcode. You can also type the code, or use a hand-held scanner."
       />
-      {/* PCs scan by lending a phone; the camera scanner is for phones. */}
-      <PhonesOnly pcPath={canPhone ? '/scan/phone' : null}>
-        <SectionCard>
-          <ScanClient notice={qr ? (NOTICES[qr] ?? null) : null} />
-        </SectionCard>
-      </PhonesOnly>
+      <SectionCard>
+        <ScanClient notice={qr ? (NOTICES[qr] ?? null) : null} />
+      </SectionCard>
+      {canPhone ? (
+        <p className="dax-muted dax-pc-only">
+          No camera on this PC, or scanning a whole delivery?{' '}
+          <Link href="/scan/phone">Scan with External Phone instead</Link>.
+        </p>
+      ) : null}
     </>
   );
 }
