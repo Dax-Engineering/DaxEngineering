@@ -17,16 +17,25 @@ import { trimQty } from '../../../../../lib/format';
 import { saveMrn } from '../_lib/actions';
 import { CustomerPicker, DepartmentSelect } from '../_lib/header-fields';
 import { MRN_SUBTYPE_OPTIONS, type MrnSubtype } from '../_lib/labels';
+import type { PickerOption } from '../../_lib/search-actions';
 import { type RequestLine, RequestLines } from '../_lib/request-lines';
+import {
+  type BundleDraft,
+  bundlesBody,
+  draftsFrom,
+  MrnBundles,
+} from './mrn-bundles';
 
 export function MrnForm({
   mrn,
   departments,
   canSubmit,
+  savedBundles = [],
 }: {
   mrn?: MrnDto;
   departments: { id: string; name: string }[];
   canSubmit: boolean;
+  savedBundles?: PickerOption[];
 }) {
   const [state, dispatch, pending] = useActionState(saveMrn, IDLE);
   const [subtype, setSubtype] = useState<MrnSubtype>(mrn?.subtype ?? 'PRT');
@@ -41,14 +50,19 @@ export function MrnForm({
   const [customerPo, setCustomerPo] = useState(mrn?.customerPo ?? '');
   const [quotationRef, setQuotationRef] = useState(mrn?.quotationRef ?? '');
   const [notes, setNotes] = useState(mrn?.notes ?? '');
+  const [bundles, setBundles] = useState<BundleDraft[]>(
+    mrn ? draftsFrom(mrn) : [],
+  );
   const [lines, setLines] = useState<RequestLine[]>(
-    mrn?.lines.map((l) => ({
-      key: l.id,
-      id: l.id,
-      part: { ...l.item, free: l.freeNow },
-      qty: trimQty(l.qtyRequested),
-      notes: l.notes ?? '',
-    })) ?? [],
+    mrn?.lines
+      .filter((l) => !l.bundleId)
+      .map((l) => ({
+        key: l.id,
+        id: l.id,
+        part: { ...l.item, free: l.freeNow },
+        qty: trimQty(l.qtyRequested),
+        notes: l.notes ?? '',
+      })) ?? [],
   );
   const err = (key: string) => fieldError(state, key);
   const known = mrn
@@ -72,6 +86,7 @@ export function MrnForm({
         qty: l.qty.trim(),
         notes: l.notes,
       })),
+      bundles: bundlesBody(bundles),
       ...(mrn ? { version: mrn.version } : {}),
     };
     startTransition(() => dispatch({ id: mrn?.id, body, submit }));
@@ -82,7 +97,7 @@ export function MrnForm({
       <StateAlert state={state} />
       <Stack gap={4}>
         <Text size="sm" fw={500}>
-          Request type
+          MRN type
         </Text>
         <SegmentedControl
           fullWidth
@@ -152,6 +167,13 @@ export function MrnForm({
         onChange={setLines}
         errors={err}
         withNotes
+        missingText="Add at least one part or bundle."
+      />
+      <MrnBundles
+        drafts={bundles}
+        onChange={setBundles}
+        saved={savedBundles}
+        errors={err}
       />
       <div className="dax-bar">
         <span className="note">

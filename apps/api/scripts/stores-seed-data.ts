@@ -313,6 +313,8 @@ export interface SeedItem {
   models: string[];
   /** Opening stock: bin code then quantity. The first bin is the item's default bin. */
   stock: [bin: string, qty: string][];
+  /** Part number (same brand) that superseded this one. */
+  supersededBy?: string;
 }
 
 // Some items start below their minimum and two start empty, so the
@@ -686,6 +688,52 @@ export const ITEMS: SeedItem[] = [
       ['HYD-02-02-A', '22'],
       ['HYD-02-02-B', '8'],
     ],
+  },
+
+  // Superseded numbers, so part families have something to show. These older
+  // numbers are made up for the demo (marked -OLD); they are not real
+  // manufacturer supersessions.
+  {
+    partNo: '1R-0750-OLD',
+    brand: 'Caterpillar',
+    description: 'Fuel filter element (superseded number)',
+    uom: 'PCS',
+    minQty: '0',
+    models: ['CAT C9 engine', 'CAT 320D excavator'],
+    stock: [['FLT-01-01-A', '5']],
+    supersededBy: '1R-0750',
+  },
+  // A chain (OLD-A -> OLD-B -> 1R-1808) with a branch (OLD-C -> OLD-B). The family
+  // has 11 against 1R-1808's minimum of 12, so it shows as below minimum.
+  {
+    partNo: '1R-1808-OLD-A',
+    brand: 'Caterpillar',
+    description: 'Engine oil filter (superseded number)',
+    uom: 'PCS',
+    minQty: '0',
+    models: ['CAT C9 engine', 'CAT 3306 generator'],
+    stock: [['FLT-01-01-B', '2']],
+    supersededBy: '1R-1808-OLD-B',
+  },
+  {
+    partNo: '1R-1808-OLD-B',
+    brand: 'Caterpillar',
+    description: 'Engine oil filter (superseded number)',
+    uom: 'PCS',
+    minQty: '0',
+    models: ['CAT C9 engine', 'CAT 3306 generator'],
+    stock: [['FLT-01-01-B', '3']],
+    supersededBy: '1R-1808',
+  },
+  {
+    partNo: '1R-1808-OLD-C',
+    brand: 'Caterpillar',
+    description: 'Engine oil filter (superseded number)',
+    uom: 'PCS',
+    minQty: '0',
+    models: ['CAT 3306 generator'],
+    stock: [['FLT-01-01-B', '0']],
+    supersededBy: '1R-1808-OLD-B',
   },
 ];
 

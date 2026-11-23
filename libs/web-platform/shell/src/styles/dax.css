@@ -695,6 +695,48 @@ a.dax-kpi:hover {
 .dax-cta:hover {
   opacity: 0.9;
 }
+button.dax-cta {
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.dax-cta.quiet {
+  background: transparent;
+  color: var(--dax-brand);
+  box-shadow: inset 0 0 0 1.5px var(--dax-brand);
+}
+
+/* Inbox bell in the header, with an unread badge */
+.dax-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  color: var(--dax-brand);
+  box-shadow: inset 0 0 0 1.5px var(--dax-line-strong);
+  text-decoration: none;
+}
+.dax-bell:hover {
+  box-shadow: inset 0 0 0 1.5px var(--dax-brand);
+}
+.dax-bell-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--dax-brand);
+  color: var(--dax-on-ink);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
 
 /* Pill search box with an inline icon */
 .dax-search {
@@ -844,6 +886,279 @@ a.dax-kpi:hover {
   grid-column: 2;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Inbox rows: the message opens its page; unread ones carry a dot */
+.dax-list li.dax-inbox-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dax-inbox-row form {
+  flex: 1;
+  min-width: 0;
+}
+.dax-inbox-open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 4px 12px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--dax-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+.dax-inbox-open:hover {
+  background: var(--dax-soft);
+}
+.dax-inbox-open .t {
+  font-weight: 500;
+}
+.dax-inbox-row[data-unread] .dax-inbox-open .t {
+  font-weight: 700;
+}
+.dax-inbox-row[data-unread] .dax-inbox-open::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 19px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--dax-brand);
+}
+.dax-inbox-open .t,
+.dax-inbox-open .s {
+  white-space: normal;
+  overflow: visible;
+}
+
+/* Superseded part families in lists: a "Supersedes" control opens one row per number */
+.dax-fam-toggle {
+  display: flex;
+  width: fit-content;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  padding: 3px 4px 3px 9px;
+  border: 1px solid var(--dax-line-strong);
+  border-radius: 12px;
+  background: var(--dax-panel);
+  cursor: pointer;
+  max-width: 360px;
+  transition: border-color 0.15s;
+}
+.dax-fam-toggle:hover {
+  border-color: var(--dax-brand);
+}
+.dax-fam-check {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.dax-fam-caret {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--dax-soft);
+  color: var(--dax-brand);
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+.dax-fam-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dax-muted);
+}
+.dax-fam-check:focus-visible ~ .dax-fam-caret {
+  outline: 2px solid var(--dax-int);
+  outline-offset: 2px;
+}
+.dax-fam-badge {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--dax-line);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.dax-fam-badge > span {
+  padding: 1px 6px;
+}
+.dax-fam-badge .pn {
+  font-family: var(--dax-f-mono);
+  font-weight: 500;
+  background: var(--dax-soft);
+  color: var(--dax-ink);
+}
+.dax-fam-badge .q {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--dax-panel);
+}
+.dax-fam-badge[data-empty] {
+  opacity: 0.5;
+}
+/* Open: rotate the caret, tint the part's own row and show its numbers. */
+tbody:has(.dax-fam-check:checked) .dax-fam-caret {
+  transform: rotate(90deg);
+}
+tbody:has(.dax-fam-check:checked) .dax-fam-toggle {
+  border-color: var(--dax-brand);
+}
+tbody:has(.dax-fam-check:checked) > tr:first-child > td {
+  background: var(--dax-int-soft);
+}
+.dax-fam-sub {
+  display: none;
+}
+tbody:has(.dax-fam-check:checked) .dax-fam-sub {
+  display: table-row;
+}
+.dax-fam-sub td {
+  background: var(--dax-soft);
+  font-size: 13px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+.dax-fam-member {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-left: 30px;
+}
+/* Tree line from the part down to each number. */
+.dax-fam-member::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: -14px;
+  width: 12px;
+  height: 24px;
+  border-left: 2px solid var(--dax-line-strong);
+  border-bottom: 2px solid var(--dax-line-strong);
+  border-bottom-left-radius: 6px;
+}
+.dax-fam-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dax-hi);
+  flex: none;
+}
+.dax-fam-dot[data-current] {
+  background: var(--dax-ok);
+}
+.dax-fam-share {
+  display: block;
+  width: 64px;
+  height: 4px;
+  margin: 4px 0 0 auto;
+  border-radius: 999px;
+  background: var(--dax-line);
+  overflow: hidden;
+}
+.dax-fam-share i {
+  display: block;
+  height: 100%;
+  background: var(--dax-hi);
+}
+.dax-fam-share i[data-current] {
+  background: var(--dax-ok);
+}
+.dax-fam-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin-top: 6px;
+}
+.dax-fam-bar {
+  display: flex;
+  gap: 2px;
+  width: 104px;
+  height: 7px;
+}
+.dax-fam-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--dax-hi);
+}
+.dax-fam-bar i[data-shade='1'] {
+  opacity: 0.6;
+}
+.dax-fam-bar i[data-current] {
+  background: var(--dax-ok);
+}
+.dax-fam-legend {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--dax-muted);
+  white-space: nowrap;
+}
+.dax-fam-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dax-fam-legend b {
+  color: var(--dax-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dax-fam-legend i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--dax-hi);
+}
+.dax-fam-legend i[data-current] {
+  background: var(--dax-ok);
+}
+.dax-row .dax-fam-bar-wrap {
+  align-items: flex-start;
+}
+.dax-fam-details {
+  border: 1px solid var(--dax-line);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.dax-fam-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--dax-brand);
+  font-weight: 600;
+}
+.dax-fam-details ul {
+  list-style: none;
+  margin: 6px 0 2px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dax-fam-details li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 /* Soft inset panel for nested blocks inside a card */
@@ -1311,7 +1626,8 @@ a.dax-pager-step:hover {
   .dax-card.flush .mantine-Table-table td:last-child {
     padding-right: 18px;
   }
-  .dax-cta {
+  .dax-cta,
+  .dax-pc-only {
     display: none;
   }
   .dax-selbar {
@@ -2204,6 +2520,27 @@ div.dax-zone-row {
   box-shadow: var(--dax-shadow-card);
   min-width: 0;
 }
+.dax-pp-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 240px;
+}
+.dax-pp-side:empty {
+  display: none;
+}
+.dax-pp-pc-cam {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.dax-pp-pc-cam > .mantine-Stack-root {
+  width: 100%;
+}
 .dax-pp-qr {
   flex: none;
   padding: 6px;
@@ -2358,7 +2695,7 @@ div.dax-zone-row {
     flex-direction: column;
     align-items: stretch;
   }
-  .dax-pp-qr {
+  .dax-pp-side {
     align-self: center;
   }
 }
@@ -2791,4 +3128,100 @@ div.dax-zone-row {
   aspect-ratio: auto;
   height: 100%;
   border-radius: 0;
+}
+
+/* Bundles: a heading row for a set of parts, with its parts indented under it. */
+.dax-bundle-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--dax-ext-soft);
+  border-left: 4px solid var(--dax-ext);
+}
+td.dax-bundle-cell {
+  background: var(--dax-ext-soft);
+  border-left: 4px solid var(--dax-ext);
+}
+.dax-bundle-head .n,
+td.dax-bundle-cell .n {
+  font-weight: 700;
+}
+.dax-bundle-part > td:first-child,
+.dax-bundle-part.dax-row,
+.dax-bundle-part.dax-line {
+  border-left: 4px solid var(--dax-ext-soft);
+  padding-left: 20px;
+}
+.dax-bundle {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--dax-line);
+  border-left: 4px solid var(--dax-ext);
+  border-radius: 12px;
+}
+
+/* Stock age: totals per band above the report, the oldest band in the high-light colour. */
+.dax-age-bands {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+.dax-age-bands .b {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--dax-panel);
+  border: 1px solid var(--dax-line);
+}
+.dax-age-bands .l {
+  font-size: 13px;
+  color: var(--dax-muted);
+}
+.dax-age-bands b {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.dax-age-bands .b.old {
+  background: var(--dax-hi-soft);
+  border-color: var(--dax-hi);
+}
+.dax-age-old {
+  color: var(--dax-hi);
+}
+
+/* Serial numbers: small monospace chips that link to the serial. */
+.dax-serials {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 6px;
+}
+.dax-serial {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--dax-soft);
+  border: 1px solid var(--dax-line);
+  color: var(--dax-ink);
+  font-size: 12px;
+  text-decoration: none;
+}
+.dax-serial .dax-mono {
+  font-size: 12px;
+}
+.dax-serial:hover {
+  border-color: var(--dax-line-strong);
+}
+.dax-serial.void {
+  text-decoration: line-through;
+  color: var(--dax-muted);
 }

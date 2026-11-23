@@ -1,6 +1,6 @@
 // `pnpm dev:phone`: the normal dev servers, plus a Cloudflare quick tunnel so a
 // phone can open the stores app over https (the camera only works on https).
-// The tunnel address changes each run; "Scan with phone" on the PC always
+// The tunnel address changes each run; "Scan with External Phone" on the PC always
 // shows the current one as a QR code.
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 
@@ -62,7 +62,7 @@ async function main() {
     [
       '',
       `  Phone scanner: ${tunnel.url}/p  (open it on the phone, bookmark it)`,
-      '  On the PC, press "Scan with phone"; point the phone at its QR code.',
+      '  On the PC, press Scan, then "Scan with External Phone"; point the phone at its QR code.',
       '  The address changes each time you run pnpm dev:phone.',
       '',
     ].join('\n'),

@@ -33,7 +33,7 @@ export default async function HoldListPage({
         back={{ href: BASE, label: 'Issuing' }}
         eyebrow="Issuing"
         title="Holds"
-        lede="Stock kept aside. Holds never expire; release them or turn them into a request."
+        lede="Stock kept aside. Holds never expire; release them or turn them into an MRN."
         actions={
           canDo(caps, 'inventory.hold.create') ? (
             <LinkButton href={`${BASE}/holds/new`}>New hold</LinkButton>

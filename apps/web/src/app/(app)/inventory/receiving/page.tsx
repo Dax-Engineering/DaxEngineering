@@ -81,7 +81,7 @@ export default async function ReceivingPage({
   if (can('inventory.grn.check'))
     tiles.push({
       href: `${BASE}/grns/new`,
-      title: 'Receive a delivery',
+      title: 'Raise GRN',
       sub: 'Pick the supplier, then scan and count what came in.',
       icon: 'truck',
       use: 'often',
@@ -112,7 +112,7 @@ export default async function ReceivingPage({
       <PageHead
         eyebrow="Inventory"
         title="Receiving"
-        lede="Check deliveries at the dock, post them into the receiving bin, then put the stock away."
+        lede="Check each delivery at the dock on a GRN, post it into the receiving bin, then put the stock away."
       />
       {kpis.length ? <KpiTiles items={kpis} /> : null}
       {tiles.length ? (
@@ -122,7 +122,7 @@ export default async function ReceivingPage({
       ) : null}
       {grns ? (
         <SectionCard
-          title="Goods received"
+          title="GRNs"
           note="GRNs at the dock and waiting for put-away"
           actions={
             <Link className="dax-link" href={`${BASE}/grns`}>

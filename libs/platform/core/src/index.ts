@@ -20,6 +20,7 @@ export * from './lib/events';
 export * from './lib/files';
 export * from './lib/crypto/rotation';
 export * from './lib/idempotency/idempotency.interceptor';
+export * from './lib/inbox';
 export * from './lib/logging';
 export * from './lib/numbering/numbering.service';
 export * from './lib/platform.module';

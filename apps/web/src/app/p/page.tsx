@@ -15,7 +15,7 @@ export const viewport: Viewport = {
 
 /**
  * The phone scanner. Bookmark this one address on the phone. There is no
- * sign-in: scanning the QR code on a PC's "Scan with phone" screen pairs the
+ * sign-in: scanning the QR code on a PC's "Scan with External Phone" screen pairs the
  * phone with that PC for a short time, and scans only go to that PC's list.
  */
 export default async function PhoneScannerPage() {

@@ -41,13 +41,15 @@ export default async function HomePage({
   const canPutAway = can('inventory.grn.putaway');
   const canSign = can('inventory.aod.attach_signed');
   const canAllocate = can('inventory.mrn.allocate');
+  const canApprove = can('inventory.aod.approve');
   const [inventory, parties, low, receiving] = await Promise.all([
     canSeeItems ? getInventorySummary() : null,
     getPartiesSummary(),
     canSeeStock ? listStock({ belowMin: 'true', limit: '5' }) : null,
     canPutAway ? getReceivingSummary() : null,
   ]);
-  const issuing = canSign || canAllocate ? await getIssuingSummary() : null;
+  const issuing =
+    canSign || canAllocate || canApprove ? await getIssuingSummary() : null;
   const firstName = caps.user.name.trim().split(/\s+/)[0] ?? caps.user.name;
 
   const kpis: Kpi[] = [];
@@ -104,10 +106,20 @@ export default async function HomePage({
   const tiles: ActionTileItem[] = [];
   if (canScan)
     tiles.push({
-      href: '/scan',
+      href: '/scan/choose',
       title: 'Scan a label',
-      sub: 'Use a phone camera on a bin or item label.',
+      sub: 'Use a camera or a phone on a bin or item label.',
       icon: 'scan',
+      use: 'often',
+    });
+  if (canApprove)
+    tiles.push({
+      href: '/inventory/issuing/aods?status=PENDING_APPROVAL',
+      title: 'Approve AODs',
+      sub: issuing
+        ? `${count.format(issuing.awaitingApproval)} waiting for your approval before Stores issues them.`
+        : 'Approve or reject AODs before Stores issues and prints them.',
+      icon: 'check',
       use: 'often',
     });
   if (canSign)
@@ -125,8 +137,8 @@ export default async function HomePage({
       href: '/inventory/issuing/mrns?status=WAITING',
       title: 'Waiting for stock',
       sub: issuing
-        ? `${count.format(issuing.mrnWaiting)} requests waiting for stock.`
-        : 'Assign new stock to waiting requests.',
+        ? `${count.format(issuing.mrnWaiting)} MRNs waiting for stock.`
+        : 'Assign new stock to waiting MRNs.',
       icon: 'history',
       use: 'often',
     });
@@ -143,8 +155,8 @@ export default async function HomePage({
   if (can('inventory.grn.check'))
     tiles.push({
       href: '/inventory/receiving/grns/new',
-      title: 'Receive a delivery',
-      sub: 'Count a delivery at the dock.',
+      title: 'Raise GRN',
+      sub: 'Check a delivery at the dock on a GRN.',
       icon: 'truck',
       use: 'often',
     });
@@ -188,6 +200,16 @@ export default async function HomePage({
         ? `${count.format(inventory.belowMin)} parts below their minimum.`
         : 'Parts below their minimum quantity.',
       icon: 'chart',
+      use: 'sometimes',
+    });
+  if (canSeeStock)
+    tiles.push({
+      href: '/inventory/reports/stock-age',
+      title: 'Stock age',
+      sub: inventory
+        ? `${count.format(inventory.agedOver)} parts held over ${count.format(inventory.agedLimit)} days.`
+        : 'How long parts have been on the shelf.',
+      icon: 'history',
       use: 'sometimes',
     });
   if (canSeeItems)

@@ -17,7 +17,9 @@ export const BASE = '/inventory/issuing';
 export const mrnPath = (id: string) => `${BASE}/mrns/${id}`;
 export const aodPath = (id: string) => `${BASE}/aods/${id}`;
 export const holdPath = (id: string) => `${BASE}/holds/${id}`;
-export const aodPdfPath = (id: string) => `/api/aods/${id}/pdf`;
+export type AodCopy = 'dax' | 'customer';
+export const aodPdfPath = (id: string, copy: AodCopy = 'dax') =>
+  `/api/aods/${id}/pdf${copy === 'customer' ? '?copy=customer' : ''}`;
 export const AOD_ENTITY = 'inventory.aod';
 
 interface Look {
@@ -39,6 +41,8 @@ export const MRN_STATUS: Record<MrnStatus, Look> = {
 
 export const AOD_STATUS: Record<AodStatus, Look> = {
   PICKING: { label: 'Picking', tone: 'hi' },
+  PENDING_APPROVAL: { label: 'Awaiting approval', tone: 'yel' },
+  APPROVED: { label: 'Approved, ready to issue', tone: 'int' },
   ISSUED: { label: 'Awaiting signature', tone: 'bad' },
   SIGNED: { label: 'Signed', tone: 'ok' },
   CANCELLED: { label: 'Cancelled', tone: 'bad' },

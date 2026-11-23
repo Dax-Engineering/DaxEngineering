@@ -5,8 +5,6 @@ import {
   type BinStockReport,
   type MovementReportPage,
   MovementReportQuery,
-  SlowMovingQuery,
-  type SlowMovingReport,
 } from '@dax/inventory-contract';
 import { Requires } from '@dax/platform-core';
 import { parse } from '../common';
@@ -64,18 +62,5 @@ export class ReportsController {
   @Header('Cache-Control', 'no-store')
   async stockByBinCsv(@Query() query: unknown): Promise<StreamableFile> {
     return csv(await this.service.stockByBinCsv(parse(BinStockQuery, query)));
-  }
-
-  @Get('slow-moving')
-  @Requires('inventory.stock.view')
-  slowMoving(@Query() query: unknown): Promise<SlowMovingReport> {
-    return this.service.slowMoving(parse(SlowMovingQuery, query));
-  }
-
-  @Get('slow-moving/csv')
-  @Requires('inventory.stock.export')
-  @Header('Cache-Control', 'no-store')
-  async slowMovingCsv(@Query() query: unknown): Promise<StreamableFile> {
-    return csv(await this.service.slowMovingCsv(parse(SlowMovingQuery, query)));
   }
 }

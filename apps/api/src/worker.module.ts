@@ -4,7 +4,12 @@ import {
   type ModuleMetadata,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { createLoggerModule, WorkerModule } from '@dax/platform-core';
+import {
+  createLoggerModule,
+  PUBLIC_ORIGINS,
+  WorkerMessagingModule,
+  WorkerModule,
+} from '@dax/platform-core';
 import { DatabaseModule } from '@dax/platform-db';
 
 const blankAsUnset = <T extends z.ZodType>(schema: T) =>
@@ -31,6 +36,9 @@ const WorkerEnvSchema = z.object({
   WORKER_POLL_MS: z.coerce.number().int().min(100).max(60_000).default(2000),
   WORKER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(20),
   WORKER_HEARTBEAT_FILE: blankAsUnset(z.string().min(1)),
+  WEB_ORIGIN: z.url().default('http://localhost:3000'),
+  RESEND_API_KEY: blankAsUnset(z.string().min(1)),
+  MAIL_FROM: blankAsUnset(z.string().min(3)),
 });
 
 export type WorkerEnv = z.infer<typeof WorkerEnvSchema>;
@@ -73,8 +81,26 @@ export class WorkerAppModule {
           batchSize: env.WORKER_BATCH_SIZE,
           heartbeatFile: env.WORKER_HEARTBEAT_FILE,
         }),
+        WorkerMessagingModule.forRoot({
+          resend:
+            env.RESEND_API_KEY && env.MAIL_FROM
+              ? { apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM }
+              : undefined,
+        }),
         ...subscribers,
       ],
+      providers: [
+        {
+          provide: PUBLIC_ORIGINS,
+          useValue: {
+            web: env.WEB_ORIGIN,
+            admin: env.WEB_ORIGIN,
+            labels: env.WEB_ORIGIN,
+          },
+        },
+      ],
+      exports: [PUBLIC_ORIGINS],
+      global: true,
     };
   }
 }

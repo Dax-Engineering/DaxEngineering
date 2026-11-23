@@ -8,6 +8,7 @@ import {
   TableTr,
 } from '@mantine/core';
 import { canDo, CardBody, Empty, PageHead, SectionCard } from '@dax/web-shell';
+import { LinkButton } from '../../../../../components/links';
 import { formatQty } from '../../../../../lib/format';
 import { requirePermission } from '../../../../../lib/server';
 import { ExportButton } from '../_lib/buttons';
@@ -20,6 +21,7 @@ export default async function BelowMinimumPage() {
   const report = await getBelowMin();
   const linked = canDo(caps, 'inventory.item.view');
   const canExport = canDo(caps, 'inventory.stock.export');
+  const canSetEmails = canDo(caps, 'inventory.low_stock.settings');
 
   return (
     <>
@@ -27,11 +29,18 @@ export default async function BelowMinimumPage() {
         eyebrow="Reports"
         title="Below minimum"
         back={{ href: BASE, label: 'Reports' }}
-        lede="Active parts whose free stock is under the minimum, most short first. Waiting is what open requests still need beyond what is already set aside for them."
+        lede="Active parts whose free stock is under the minimum, most short first. Waiting is what open MRNs still need beyond what is already set aside for them."
         actions={
-          canExport && report.items.length ? (
-            <ExportButton href={exportHref('below-minimum')} />
-          ) : null
+          <>
+            {canSetEmails ? (
+              <LinkButton variant="default" href={`${BASE}/low-stock-emails`}>
+                Email settings
+              </LinkButton>
+            ) : null}
+            {canExport && report.items.length ? (
+              <ExportButton href={exportHref('below-minimum')} />
+            ) : null}
+          </>
         }
       />
       <TruncatedNote truncated={report.truncated} canExport={canExport} />
@@ -61,7 +70,7 @@ export default async function BelowMinimumPage() {
                     <TableTh ta="right">Held</TableTh>
                     <TableTh ta="right">Free</TableTh>
                     <TableTh ta="right">Short by</TableTh>
-                    <TableTh ta="right">Waiting on requests</TableTh>
+                    <TableTh ta="right">Waiting on MRNs</TableTh>
                   </TableTr>
                 </TableThead>
                 <TableTbody>
@@ -122,8 +131,7 @@ export default async function BelowMinimumPage() {
                     </span>
                     {Number(row.waiting) > 0 ? (
                       <span className="dax-sub">
-                        Waiting on requests {formatQty(row.waiting)}{' '}
-                        {row.item.uom}
+                        Waiting on MRNs {formatQty(row.waiting)} {row.item.uom}
                       </span>
                     ) : null}
                   </div>

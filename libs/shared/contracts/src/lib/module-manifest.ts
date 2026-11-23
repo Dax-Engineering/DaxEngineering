@@ -40,8 +40,9 @@ export interface ModuleManifest {
   readonly features: Readonly<Record<string, FeatureDef>>;
   readonly numberSeries?: readonly NumberSeriesDef[];
   readonly menu?: readonly MenuEntryDef[];
+  /** Per role: action → scope. `null` keeps an action out of that role's `'*'`. */
   readonly defaultGrants?: Readonly<
-    Record<string, Readonly<Record<string, GrantScope>>>
+    Record<string, Readonly<Record<string, GrantScope | null>>>
   >;
 }
 

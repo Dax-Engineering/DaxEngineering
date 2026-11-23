@@ -48,6 +48,8 @@ enum AodType {
 
 enum AodStatus {
   PICKING
+  PENDING_APPROVAL
+  APPROVED
   ISSUED
   SIGNED
   CANCELLED
@@ -67,7 +69,8 @@ model Reservation {
   createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  @@unique([source, sourceLineId])
+  @@unique([source, sourceLineId, itemId])
+  @@index([source, sourceLineId])
   @@index([itemId])
   @@index([source, sourceId])
   @@map("reservation")
@@ -114,32 +117,33 @@ model HoldLine {
 }
 
 model Mrn {
-  id             String     @id @default(uuid(7)) @db.Uuid
-  number         String?    @unique
+  id             String      @id @default(uuid(7)) @db.Uuid
+  number         String?     @unique
   subtype        MrnSubtype
-  status         MrnStatus  @default(DRAFT)
-  departmentId   String     @map("department_id") @db.Uuid
-  departmentName String     @map("department_name")
-  customerId     String?    @map("customer_id") @db.Uuid
-  customerName   String?    @map("customer_name")
-  jobNumber      String?    @map("job_number")
-  customerPo     String?    @map("customer_po")
-  quotationRef   String?    @map("quotation_ref")
+  status         MrnStatus   @default(DRAFT)
+  departmentId   String      @map("department_id") @db.Uuid
+  departmentName String      @map("department_name")
+  customerId     String?     @map("customer_id") @db.Uuid
+  customerName   String?     @map("customer_name")
+  jobNumber      String?     @map("job_number")
+  customerPo     String?     @map("customer_po")
+  quotationRef   String?     @map("quotation_ref")
   notes          String?
-  holdId         String?    @map("hold_id") @db.Uuid
-  submittedBy    String?    @map("submitted_by") @db.Uuid
-  submittedAt    DateTime?  @map("submitted_at") @db.Timestamptz(3)
-  checkedBy      String?    @map("checked_by") @db.Uuid
-  checkedAt      DateTime?  @map("checked_at") @db.Timestamptz(3)
-  closedBy       String?    @map("closed_by") @db.Uuid
-  closedAt       DateTime?  @map("closed_at") @db.Timestamptz(3)
-  closeReason    String?    @map("close_reason")
-  version        Int        @default(1)
-  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  createdBy      String     @map("created_by") @db.Uuid
-  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
-  updatedBy      String     @map("updated_by") @db.Uuid
+  holdId         String?     @map("hold_id") @db.Uuid
+  submittedBy    String?     @map("submitted_by") @db.Uuid
+  submittedAt    DateTime?   @map("submitted_at") @db.Timestamptz(3)
+  checkedBy      String?     @map("checked_by") @db.Uuid
+  checkedAt      DateTime?   @map("checked_at") @db.Timestamptz(3)
+  closedBy       String?     @map("closed_by") @db.Uuid
+  closedAt       DateTime?   @map("closed_at") @db.Timestamptz(3)
+  closeReason    String?     @map("close_reason")
+  version        Int         @default(1)
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdBy      String      @map("created_by") @db.Uuid
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedBy      String      @map("updated_by") @db.Uuid
   lines          MrnLine[]
+  bundles        MrnBundle[]
   aods           Aod[]
 
   @@index([status, createdAt])
@@ -150,46 +154,59 @@ model Mrn {
 }
 
 model MrnLine {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  mrnId          String    @map("mrn_id") @db.Uuid
-  mrn            Mrn       @relation(fields: [mrnId], references: [id], onDelete: Cascade)
-  lineNo         Int       @map("line_no")
-  itemId         String    @map("item_id") @db.Uuid
-  item           Item      @relation(fields: [itemId], references: [id])
-  qtyRequested   Decimal   @map("qty_requested") @db.Decimal(14, 3)
-  qtyIssued      Decimal   @default(0) @map("qty_issued") @db.Decimal(14, 3)
-  qtyShortClosed Decimal   @default(0) @map("qty_short_closed") @db.Decimal(14, 3)
+  id             String     @id @default(uuid(7)) @db.Uuid
+  mrnId          String     @map("mrn_id") @db.Uuid
+  mrn            Mrn        @relation(fields: [mrnId], references: [id], onDelete: Cascade)
+  lineNo         Int        @map("line_no")
+  itemId         String     @map("item_id") @db.Uuid
+  item           Item       @relation(fields: [itemId], references: [id])
+  qtyRequested   Decimal    @map("qty_requested") @db.Decimal(14, 3)
+  qtyIssued      Decimal    @default(0) @map("qty_issued") @db.Decimal(14, 3)
+  qtyShortClosed Decimal    @default(0) @map("qty_short_closed") @db.Decimal(14, 3)
   notes          String?
+  /// Set when the line is a part of a bundle on this MRN.
+  mrnBundleId    String?    @map("mrn_bundle_id") @db.Uuid
+  mrnBundle      MrnBundle? @relation(fields: [mrnBundleId], references: [id], onDelete: Cascade)
+  /// How many of this part one set of the bundle holds.
+  qtyPerSet      Decimal?   @map("qty_per_set") @db.Decimal(14, 3)
   aodLines       AodLine[]
 
   @@unique([mrnId, lineNo])
+  @@index([mrnBundleId])
   @@index([itemId])
   @@map("mrn_line")
   @@schema("inventory")
 }
 
 model Aod {
-  id          String       @id @default(uuid(7)) @db.Uuid
-  number      String?      @unique
-  type        AodType
-  status      AodStatus    @default(PICKING)
-  mrnId       String       @map("mrn_id") @db.Uuid
-  mrn         Mrn          @relation(fields: [mrnId], references: [id])
-  deliverTo   String?      @map("deliver_to")
-  vehicleNo   String?      @map("vehicle_no")
-  notes       String?
-  issuedBy    String?      @map("issued_by") @db.Uuid
-  issuedAt    DateTime?    @map("issued_at") @db.Timestamptz(3)
-  signedBy    String?      @map("signed_by") @db.Uuid
-  signedAt    DateTime?    @map("signed_at") @db.Timestamptz(3)
-  signedFile  String?      @map("signed_file") @db.Uuid
-  version     Int          @default(1)
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  createdBy   String       @map("created_by") @db.Uuid
-  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
-  updatedBy   String       @map("updated_by") @db.Uuid
-  lines       AodLine[]
-  returnNotes ReturnNote[]
+  id           String       @id @default(uuid(7)) @db.Uuid
+  number       String?      @unique
+  type         AodType
+  status       AodStatus    @default(PICKING)
+  mrnId        String       @map("mrn_id") @db.Uuid
+  mrn          Mrn          @relation(fields: [mrnId], references: [id])
+  deliverTo    String?      @map("deliver_to")
+  vehicleNo    String?      @map("vehicle_no")
+  notes        String?
+  submittedBy  String?      @map("submitted_by") @db.Uuid
+  submittedAt  DateTime?    @map("submitted_at") @db.Timestamptz(3)
+  approvedBy   String?      @map("approved_by") @db.Uuid
+  approvedAt   DateTime?    @map("approved_at") @db.Timestamptz(3)
+  rejectedBy   String?      @map("rejected_by") @db.Uuid
+  rejectedAt   DateTime?    @map("rejected_at") @db.Timestamptz(3)
+  rejectReason String?      @map("reject_reason")
+  issuedBy     String?      @map("issued_by") @db.Uuid
+  issuedAt     DateTime?    @map("issued_at") @db.Timestamptz(3)
+  signedBy     String?      @map("signed_by") @db.Uuid
+  signedAt     DateTime?    @map("signed_at") @db.Timestamptz(3)
+  signedFile   String?      @map("signed_file") @db.Uuid
+  version      Int          @default(1)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdBy    String       @map("created_by") @db.Uuid
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedBy    String       @map("updated_by") @db.Uuid
+  lines        AodLine[]
+  returnNotes  ReturnNote[]
 
   @@index([status, createdAt])
   @@index([mrnId])
@@ -198,21 +215,126 @@ model Aod {
 }
 
 model AodLine {
-  id          String       @id @default(uuid(7)) @db.Uuid
-  aodId       String       @map("aod_id") @db.Uuid
-  aod         Aod          @relation(fields: [aodId], references: [id], onDelete: Cascade)
-  mrnLineId   String       @map("mrn_line_id") @db.Uuid
-  mrnLine     MrnLine      @relation(fields: [mrnLineId], references: [id])
-  itemId      String       @map("item_id") @db.Uuid
-  item        Item         @relation(fields: [itemId], references: [id])
-  binId       String?      @map("bin_id") @db.Uuid
-  bin         Bin?         @relation(fields: [binId], references: [id])
-  qty         Decimal      @db.Decimal(14, 3)
-  scanned     Boolean      @default(false)
-  returnLines ReturnLine[]
+  id             String       @id @default(uuid(7)) @db.Uuid
+  aodId          String       @map("aod_id") @db.Uuid
+  aod            Aod          @relation(fields: [aodId], references: [id], onDelete: Cascade)
+  mrnLineId      String       @map("mrn_line_id") @db.Uuid
+  mrnLine        MrnLine      @relation(fields: [mrnLineId], references: [id])
+  itemId         String       @map("item_id") @db.Uuid
+  item           Item         @relation(fields: [itemId], references: [id])
+  binId          String?      @map("bin_id") @db.Uuid
+  bin            Bin?         @relation(fields: [binId], references: [id])
+  qty            Decimal      @db.Decimal(14, 3)
+  scanned        Boolean      @default(false)
+  /// The customer's own number for this part, copied when the line is made.
+  customerPartNo String?      @map("customer_part_no")
+  returnLines    ReturnLine[]
 
   @@index([aodId])
+  @@index([customerPartNo])
   @@index([mrnLineId])
   @@map("aod_line")
+  @@schema("inventory")
+}
+
+/// DAX-generated part number unique to one customer: <customer code>-<running number>.
+model CustomerPart {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  customerId   String   @map("customer_id") @db.Uuid
+  customerCode String   @map("customer_code")
+  customerName String   @map("customer_name")
+  itemId       String   @map("item_id") @db.Uuid
+  item         Item     @relation(fields: [itemId], references: [id])
+  seq          Int
+  partNo       String   @unique @map("part_no")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdBy    String   @map("created_by") @db.Uuid
+
+  @@unique([customerId, itemId])
+  @@unique([customerId, seq])
+  @@index([itemId])
+  @@map("customer_part")
+  @@schema("inventory")
+}
+
+model CustomerPartCounter {
+  customerId String @id @map("customer_id") @db.Uuid
+  last       Int    @default(0)
+
+  @@map("customer_part_counter")
+  @@schema("inventory")
+}
+
+/// A saved set of parts that goes out together, for any customer.
+model Bundle {
+  id              String               @id @default(uuid(7)) @db.Uuid
+  name            String               @unique
+  description     String?
+  active          Boolean              @default(true)
+  version         Int                  @default(1)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdBy       String               @map("created_by") @db.Uuid
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedBy       String               @map("updated_by") @db.Uuid
+  lines           BundleLine[]
+  mrnBundles      MrnBundle[]
+  customerNumbers CustomerBundlePart[]
+
+  @@map("bundle")
+  @@schema("inventory")
+}
+
+model BundleLine {
+  id       String  @id @default(uuid(7)) @db.Uuid
+  bundleId String  @map("bundle_id") @db.Uuid
+  bundle   Bundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  lineNo   Int     @map("line_no")
+  itemId   String  @map("item_id") @db.Uuid
+  item     Item    @relation(fields: [itemId], references: [id])
+  qty      Decimal @db.Decimal(14, 3)
+
+  @@unique([bundleId, lineNo])
+  @@index([itemId])
+  @@map("bundle_line")
+  @@schema("inventory")
+}
+
+/// A bundle requested on an MRN: a saved bundle copied in, or a one-off set.
+model MrnBundle {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  mrnId          String    @map("mrn_id") @db.Uuid
+  mrn            Mrn       @relation(fields: [mrnId], references: [id], onDelete: Cascade)
+  lineNo         Int       @map("line_no")
+  bundleId       String?   @map("bundle_id") @db.Uuid
+  bundle         Bundle?   @relation(fields: [bundleId], references: [id])
+  name           String
+  qtySets        Int       @map("qty_sets")
+  /// The customer's number for this bundle, set when its first AOD is raised.
+  customerPartNo String?   @map("customer_part_no")
+  lines          MrnLine[]
+
+  @@unique([mrnId, lineNo])
+  @@index([bundleId])
+  @@index([customerPartNo])
+  @@map("mrn_bundle")
+  @@schema("inventory")
+}
+
+/// DAX-generated number for a saved bundle at one customer, from the customer's running sequence.
+model CustomerBundlePart {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  customerId   String   @map("customer_id") @db.Uuid
+  customerCode String   @map("customer_code")
+  customerName String   @map("customer_name")
+  bundleId     String   @map("bundle_id") @db.Uuid
+  bundle       Bundle   @relation(fields: [bundleId], references: [id])
+  seq          Int
+  partNo       String   @unique @map("part_no")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdBy    String   @map("created_by") @db.Uuid
+
+  @@unique([customerId, bundleId])
+  @@index([bundleId])
+  @@map("customer_bundle_part")
   @@schema("inventory")
 }

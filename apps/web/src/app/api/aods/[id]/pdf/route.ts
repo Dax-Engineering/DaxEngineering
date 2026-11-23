@@ -17,10 +17,14 @@ export async function GET(
   }
   const { id } = await ctx.params;
   if (!isUuid(id)) return plainText(404, 'AOD not found.');
+  const customer = new URL(request.url).searchParams.get('copy') === 'customer';
 
-  const upstream = await api.call(`/inventory/aods/${id}/pdf`, {
-    accept: 'application/pdf',
-  });
+  const upstream = await api.call(
+    `/inventory/aods/${id}/pdf${customer ? '?copy=customer' : ''}`,
+    {
+      accept: 'application/pdf',
+    },
+  );
   if (upstream.status === 401) {
     await upstream.body?.cancel();
     return new Response(null, {
@@ -30,18 +34,25 @@ export async function GET(
   }
   if (!upstream.ok) {
     await upstream.body?.cancel();
-    const status = [403, 404].includes(upstream.status) ? upstream.status : 502;
+    const status = [403, 404, 409].includes(upstream.status)
+      ? upstream.status
+      : 502;
     return plainText(
       status,
       status === 403
         ? "You don't have permission to print this AOD."
         : status === 404
           ? 'AOD not found.'
-          : 'The AOD could not be made. Close this tab and try again.',
+          : status === 409
+            ? 'This AOD cannot be printed in that form yet. Close this tab and check the AOD.'
+            : 'The AOD could not be made. Close this tab and try again.',
     );
   }
   return relayFile(upstream, {
     contentType: 'application/pdf',
-    disposition: contentDisposition('inline', `aod-${id}.pdf`),
+    disposition: contentDisposition(
+      'inline',
+      `aod-${id}${customer ? '-customer' : ''}.pdf`,
+    ),
   });
 }

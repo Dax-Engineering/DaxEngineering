@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { GrnLineSerial } from './serials';
 import {
   OptionalText,
   PageParams,
@@ -116,6 +117,7 @@ export const GrnDto = GrnSummary.extend({
       wrongItem: z.boolean(),
       notes: z.string().nullable(),
       defaultBin: z.object({ id: z.uuid(), code: z.string() }).nullable(),
+      serials: z.array(GrnLineSerial),
     }),
   ),
   discrepancies: z.array(

@@ -18,7 +18,7 @@ export default async function ScanWithPhonePage() {
     <>
       <PageHead
         eyebrow="Inventory"
-        title="Scan with a phone"
+        title="Scan with External Phone"
         lede="Use a phone as a scanner for 15 minutes. Open the phone scanner on the phone, point it at the QR code here, and its scans build a list below."
       />
       <PhonePanel

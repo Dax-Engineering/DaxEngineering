@@ -79,6 +79,9 @@ services:
       WORKER_POLL_MS: ${WORKER_POLL_MS:-2000}
       WORKER_BATCH_SIZE: ${WORKER_BATCH_SIZE:-20}
       WORKER_HEARTBEAT_FILE: /tmp/dax-worker.heartbeat
+      WEB_ORIGIN: ${WEB_ORIGIN:?set in Dokploy}
+      RESEND_API_KEY: ${RESEND_API_KEY:?set in Dokploy}
+      MAIL_FROM: ${MAIL_FROM:?set in Dokploy}
     healthcheck:
       test:
         - CMD

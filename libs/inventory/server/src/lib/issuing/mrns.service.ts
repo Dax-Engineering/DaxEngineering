@@ -35,7 +35,8 @@ import {
   userNames,
 } from '../receiving/shared';
 import { dec, qtyString, stockFigures } from '../stock-math';
-import { StockPostingService } from '../stock/stock-posting.service';
+import { checkBundleLines } from '../bundles/bundles.service';
+import { StockPostingService, totalFree } from '../stock/stock-posting.service';
 import {
   assertHoldActive,
   assertMrnAction,
@@ -46,6 +47,7 @@ import {
   OPEN_MRN_STATUSES,
   outstandingQty,
   toReserve,
+  UNISSUED_AOD_STATUSES,
   waitingQty,
 } from './rules';
 import {
@@ -62,6 +64,7 @@ import {
   type MrnReleaseGate,
   mrnScope,
   notEnoughFor,
+  seesAod,
   seesMrnCustomer,
 } from './shared';
 
@@ -108,12 +111,30 @@ const DETAIL_SELECT = {
       ...LINE_QTY_SELECT,
       lineNo: true,
       notes: true,
+      mrnBundleId: true,
+      qtyPerSet: true,
       item: { select: ITEM_REF_SELECT },
     },
     orderBy: { lineNo: 'asc' },
   },
+  bundles: {
+    select: {
+      id: true,
+      bundleId: true,
+      name: true,
+      qtySets: true,
+      customerPartNo: true,
+    },
+    orderBy: { lineNo: 'asc' },
+  },
   aods: {
-    select: { id: true, number: true, type: true, status: true },
+    select: {
+      id: true,
+      number: true,
+      type: true,
+      status: true,
+      approvedAt: true,
+    },
     orderBy: { createdAt: 'asc' },
   },
 } as const;
@@ -131,14 +152,43 @@ export async function reservationsOf(
     where: { source: 'MRN', sourceLineId: { in: [...lineIds] } },
     select: { sourceLineId: true, qty: true },
   });
-  return new Map(rows.map((r) => [r.sourceLineId, dec(r.qty)]));
+  const total = new Map<string, Prisma.Decimal>();
+  for (const r of rows) {
+    total.set(
+      r.sourceLineId,
+      (total.get(r.sourceLineId) ?? dec(0)).plus(dec(r.qty)),
+    );
+  }
+  return total;
+}
+
+/** What each MRN line has reserved, per family number. */
+export async function reservationsByItem(
+  db: Db,
+  lineIds: readonly string[],
+): Promise<Map<string, Map<string, Prisma.Decimal>>> {
+  const out = new Map<string, Map<string, Prisma.Decimal>>();
+  if (lineIds.length === 0) return out;
+  const rows = await db.reservation.findMany({
+    where: { source: 'MRN', sourceLineId: { in: [...lineIds] } },
+    select: { sourceLineId: true, itemId: true, qty: true },
+  });
+  for (const r of rows) {
+    const byItem = out.get(r.sourceLineId) ?? new Map<string, Prisma.Decimal>();
+    byItem.set(r.itemId, dec(r.qty));
+    out.set(r.sourceLineId, byItem);
+  }
+  return out;
 }
 
 export async function waitingMrnIds(db: Db): Promise<string[]> {
   const rows = await db.$queryRaw<{ mrn_id: string }[]>`
     SELECT DISTINCT l.mrn_id FROM inventory.mrn_line l
     JOIN inventory.mrn m ON m.id = l.mrn_id
-    LEFT JOIN inventory.reservation r ON r.source = 'MRN' AND r.source_line_id = l.id
+    LEFT JOIN LATERAL (
+      SELECT SUM(qty) AS qty FROM inventory.reservation
+      WHERE source = 'MRN' AND source_line_id = l.id
+    ) r ON true
     WHERE m.status IN ('CHECKED', 'READY', 'PARTLY_ISSUED')
       AND l.qty_requested - l.qty_issued - l.qty_short_closed - COALESCE(r.qty, 0) > 0`;
   return rows.map((r) => r.mrn_id);
@@ -242,52 +292,77 @@ export class MrnsService {
       where: { id, ...(scoped ? mrnScope(policy) : {}) },
       select: DETAIL_SELECT,
     });
-    if (!row) notFound('Request not found.');
+    if (!row) notFound('MRN not found.');
     return this.toDetail(policy, row);
   }
 
   private async toDetail(policy: Policy, row: DetailRow): Promise<MrnDto> {
     const storeId = await this.store.id();
-    const itemIds = [...new Set(row.lines.map((l) => l.itemId))];
-    const [reserved, names, hold, balances, binStock] = await Promise.all([
-      reservationsOf(
-        this.prisma,
-        row.lines.map((l) => l.id),
-      ),
-      userNames(this.prisma, [row.submittedBy, row.checkedBy, row.closedBy]),
-      row.holdId
-        ? this.prisma.hold.findUnique({
-            where: { id: row.holdId },
-            select: { id: true, number: true },
-          })
-        : null,
-      this.prisma.stockBalance.findMany({
-        where: { storeId, itemId: { in: itemIds } },
-        select: {
-          itemId: true,
-          onHand: true,
-          held: true,
-          quarantine: true,
-          receiving: true,
-        },
-      }),
-      this.prisma.binStock.findMany({
-        where: {
-          itemId: { in: itemIds },
-          qty: { gt: 0 },
-          bin: { kind: 'STORAGE', active: true, storeId },
-        },
-        select: {
-          itemId: true,
-          qty: true,
-          bin: { select: { id: true, code: true } },
-        },
-        orderBy: { bin: { code: 'asc' } },
-      }),
-    ]);
+    const lineItems = await this.prisma.item.findMany({
+      where: { id: { in: [...new Set(row.lines.map((l) => l.itemId))] } },
+      select: { id: true, familyId: true },
+    });
+    const familyOf = new Map(lineItems.map((i) => [i.id, i.familyId]));
+    const members = await this.prisma.item.findMany({
+      where: { familyId: { in: [...new Set(familyOf.values())] } },
+      select: { ...ITEM_REF_SELECT, familyId: true, familyDepth: true },
+      orderBy: [{ familyDepth: 'desc' }, { partNo: 'asc' }],
+    });
+    const memberById = new Map(members.map((m) => [m.id, m]));
+    const itemIds = members.map((m) => m.id);
+    const [reserved, reservedBy, names, hold, balances, binStock] =
+      await Promise.all([
+        reservationsOf(
+          this.prisma,
+          row.lines.map((l) => l.id),
+        ),
+        reservationsByItem(
+          this.prisma,
+          row.lines.map((l) => l.id),
+        ),
+        userNames(this.prisma, [row.submittedBy, row.checkedBy, row.closedBy]),
+        row.holdId
+          ? this.prisma.hold.findUnique({
+              where: { id: row.holdId },
+              select: { id: true, number: true },
+            })
+          : null,
+        this.prisma.stockBalance.findMany({
+          where: { storeId, itemId: { in: itemIds } },
+          select: {
+            itemId: true,
+            onHand: true,
+            held: true,
+            quarantine: true,
+            receiving: true,
+          },
+        }),
+        this.prisma.binStock.findMany({
+          where: {
+            itemId: { in: itemIds },
+            qty: { gt: 0 },
+            bin: { kind: 'STORAGE', active: true, storeId },
+          },
+          select: {
+            itemId: true,
+            qty: true,
+            bin: { select: { id: true, code: true } },
+          },
+          orderBy: { bin: { code: 'asc' } },
+        }),
+      ]);
     const free = new Map(
-      balances.map((b) => [b.itemId, stockFigures(b).figures.free]),
+      balances.map((b) => [b.itemId, dec(stockFigures(b).figures.free)]),
     );
+    const family = (itemId: string) => {
+      const familyId = familyOf.get(itemId) ?? itemId;
+      return members.filter((m) => m.familyId === familyId);
+    };
+    const familyFree = (itemId: string) =>
+      family(itemId).reduce((sum, m) => {
+        const f = free.get(m.id) ?? dec(0);
+        return f.gt(0) ? sum.plus(f) : sum;
+      }, dec(0));
     return {
       ...toSummary(row, seesMrnCustomer(policy), reserved),
       customerPo: row.customerPo,
@@ -308,17 +383,62 @@ export class MrnsService {
         qtyIssued: qtyString(l.qtyIssued),
         qtyShortClosed: qtyString(l.qtyShortClosed),
         qtyWaiting: qtyString(lineWaiting(row.status, l, reserved)),
-        freeNow: free.get(l.itemId) ?? '0',
+        freeNow: qtyString(familyFree(l.itemId)),
         notes: l.notes,
+        bundleId: l.mrnBundleId,
+        qtyPerSet: l.qtyPerSet === null ? null : qtyString(l.qtyPerSet),
         bins: binStock
-          .filter((b) => b.itemId === l.itemId)
+          .filter((b) => family(l.itemId).some((m) => m.id === b.itemId))
           .map((b) => ({
             id: b.bin.id,
             code: b.bin.code,
             qty: qtyString(b.qty),
+            itemId: b.itemId,
+            partNo: memberById.get(b.itemId)?.partNo ?? '',
           })),
+        reservedBy: family(l.itemId).flatMap((m) => {
+          const qty = reservedBy.get(l.id)?.get(m.id);
+          return qty?.gt(0)
+            ? [{ item: toItemRef(m), qty: qtyString(qty) }]
+            : [];
+        }),
+        supersededBy: (() => {
+          const root = memberById.get(familyOf.get(l.itemId) ?? l.itemId);
+          return root && root.id !== l.itemId ? toItemRef(root) : null;
+        })(),
       })),
-      aods: row.aods,
+      bundles: row.bundles.map((b) => {
+        const parts = row.lines.filter((l) => l.mrnBundleId === b.id);
+        const sets = (qty: (l: (typeof parts)[number]) => Prisma.Decimal) =>
+          parts.length === 0
+            ? 0
+            : Math.min(
+                ...parts.map((l) =>
+                  Math.floor(
+                    qty(l)
+                      .div(dec(l.qtyPerSet ?? 1))
+                      .toNumber() + 1e-9,
+                  ),
+                ),
+              );
+        return {
+          id: b.id,
+          bundleId: b.bundleId,
+          name: b.name,
+          qtySets: b.qtySets,
+          setsReady: sets((l) => reserved.get(l.id) ?? dec(0)),
+          setsIssued: sets((l) => dec(l.qtyIssued)),
+          customerPartNo: seesMrnCustomer(policy) ? b.customerPartNo : null,
+        };
+      }),
+      aods: row.aods
+        .filter((a) => seesAod(policy, a, row.departmentId))
+        .map((a) => ({
+          id: a.id,
+          number: a.number,
+          type: a.type,
+          status: a.status,
+        })),
     };
   }
 
@@ -334,6 +454,8 @@ export class MrnsService {
       mrnWaiting,
       mrnReady,
       picking,
+      awaitingApproval,
+      approved,
       awaitingSignature,
       activeHolds,
     ] = await Promise.all([
@@ -346,6 +468,16 @@ export class MrnsService {
       aods
         ? this.prisma.aod.count({
             where: { AND: [aods, { status: 'PICKING' }] },
+          })
+        : 0,
+      aods
+        ? this.prisma.aod.count({
+            where: { AND: [aods, { status: 'PENDING_APPROVAL' }] },
+          })
+        : 0,
+      aods
+        ? this.prisma.aod.count({
+            where: { AND: [aods, { status: 'APPROVED' }] },
           })
         : 0,
       aods
@@ -365,6 +497,8 @@ export class MrnsService {
       mrnWaiting,
       mrnReady,
       picking,
+      awaitingApproval,
+      approved,
       awaitingSignature,
       activeHolds,
     };
@@ -374,6 +508,7 @@ export class MrnsService {
     const department = await activeDepartment(this.prisma, input.departmentId);
     const customer = await activeCustomer(this.prisma, input.customerId);
     const plan = await this.planLines([], input.lines);
+    const bundles = await this.planBundles(input.bundles ?? []);
     const id = await this.prisma.$transaction(async (tx) => {
       const created = await tx.mrn.create({
         data: {
@@ -399,8 +534,14 @@ export class MrnsService {
         },
         select: { id: true },
       });
+      await writeBundles(tx, created.id, bundles);
       await this.audit.record(
         auditEntry(MRN_KEY, created.id, 'create', {
+          bundles: bundles.map((b) => ({
+            name: b.name,
+            sets: b.qtySets,
+            lines: b.lines,
+          })),
           subtype: input.subtype,
           departmentId: department.id,
           customerId: customer?.id ?? null,
@@ -431,13 +572,18 @@ export class MrnsService {
         quotationRef: true,
         notes: true,
         lines: {
+          where: { mrnBundleId: null },
           select: { id: true, itemId: true, qtyRequested: true, notes: true },
           orderBy: { lineNo: 'asc' },
         },
       },
     });
-    if (!before) notFound('Request not found.');
+    if (!before) notFound('MRN not found.');
     this.guard('edit', before, input.version);
+    const bundles =
+      input.bundles === undefined
+        ? null
+        : await this.planBundles(input.bundles);
     const changes: Record<string, unknown> = {};
     if (input.subtype !== undefined) changes['subtype'] = input.subtype;
     for (const key of [
@@ -468,12 +614,20 @@ export class MrnsService {
     await this.prisma.$transaction(async (tx) => {
       await this.claim(tx, id, 'edit', input.version, policy.userId, changes);
       if (plan) await replaceLines(tx, id, before.lines, plan);
+      if (bundles) await writeBundles(tx, id, bundles);
       const beforeValues: Record<string, unknown> = {};
       for (const key of Object.keys(changes)) {
         if (key in before)
           beforeValues[key] = before[key as keyof typeof before];
       }
       const afterValues: Record<string, unknown> = { ...changes };
+      if (bundles) {
+        afterValues['bundles'] = bundles.map((b) => ({
+          name: b.name,
+          sets: b.qtySets,
+          lines: b.lines,
+        }));
+      }
       delete afterValues['departmentName'];
       delete afterValues['customerName'];
       if (plan) {
@@ -509,7 +663,7 @@ export class MrnsService {
     return inputs.map((line, i) => {
       const prev = line.id ? current.get(line.id) : undefined;
       if (line.id && (!prev || seen.has(line.id))) {
-        invalid('That line is not on this request.', [`lines.${i}.id`]);
+        invalid('That line is not on this MRN.', [`lines.${i}.id`]);
       }
       if (prev) seen.add(prev.id);
       const item = requireItem(
@@ -529,12 +683,53 @@ export class MrnsService {
     });
   }
 
+  /** Checks bundles: a saved bundle must exist and be active; parts as for loose lines. */
+  private async planBundles(
+    inputs: NonNullable<MrnInput['bundles']>,
+  ): Promise<BundlePlan[]> {
+    const savedIds = inputs.flatMap((b) => (b.bundleId ? [b.bundleId] : []));
+    const saved = new Map(
+      (
+        await this.prisma.bundle.findMany({
+          where: { id: { in: savedIds } },
+          select: { id: true, active: true, name: true },
+        })
+      ).map((b) => [b.id, b]),
+    );
+    const plans: BundlePlan[] = [];
+    for (const [i, b] of inputs.entries()) {
+      if (b.bundleId) {
+        const found = saved.get(b.bundleId);
+        if (!found) invalid('That bundle no longer exists.', [`bundles.${i}`]);
+        if (!found.active) {
+          invalid(`${found.name} is archived.`, [`bundles.${i}`]);
+        }
+      }
+      await checkBundleLines(
+        this.prisma,
+        b.lines.map((l) => ({ itemId: l.itemId, qty: l.qtyPerSet })),
+        `bundles.${i}.lines`,
+      );
+      plans.push({
+        bundleId: b.bundleId ?? null,
+        name: b.name,
+        qtySets: b.qtySets,
+        lines: b.lines.map((l) => ({
+          itemId: l.itemId,
+          qtyPerSet: qtyString(l.qtyPerSet),
+          qtyRequested: qtyString(dec(l.qtyPerSet).times(b.qtySets)),
+        })),
+      });
+    }
+    return plans;
+  }
+
   async submit(policy: Policy, id: string, version: number): Promise<MrnDto> {
     const before = await this.prisma.mrn.findUnique({
       where: { id },
       select: { status: true, version: true, subtype: true },
     });
-    if (!before) notFound('Request not found.');
+    if (!before) notFound('MRN not found.');
     this.guard('submit', before, version);
     await this.prisma.$transaction(async (tx) => {
       await this.claim(tx, id, 'submit', version, policy.userId, {});
@@ -572,7 +767,7 @@ export class MrnsService {
       where: { id },
       select: { status: true, version: true },
     });
-    if (!before) notFound('Request not found.');
+    if (!before) notFound('MRN not found.');
     this.guard('check', before, version);
     await this.prisma.$transaction(async (tx) => {
       await this.claim(tx, id, 'check', version, policy.userId, {
@@ -609,7 +804,7 @@ export class MrnsService {
       where: { id },
       select: { status: true, version: true },
     });
-    if (!before) notFound('Request not found.');
+    if (!before) notFound('MRN not found.');
     this.guard('allocate', before, input.version);
     const wanted = input.lines
       ? sumByLine(input.lines.map((l) => ({ lineId: l.mrnLineId, qty: l.qty })))
@@ -647,13 +842,16 @@ export class MrnsService {
   }> {
     const lines = await tx.mrnLine.findMany({
       where: { mrnId },
-      select: { ...LINE_QTY_SELECT, item: { select: { partNo: true } } },
-      orderBy: [{ itemId: 'asc' }, { lineNo: 'asc' }],
+      select: {
+        ...LINE_QTY_SELECT,
+        item: { select: { partNo: true, familyId: true } },
+      },
+      orderBy: [{ item: { familyId: 'asc' } }, { lineNo: 'asc' }],
     });
     if (wanted) {
       for (const lineId of wanted.keys()) {
         if (!lines.some((l) => l.id === lineId)) {
-          invalid('That line is not on this request.', ['lines']);
+          invalid('That line is not on this MRN.', ['lines']);
         }
       }
     }
@@ -666,7 +864,9 @@ export class MrnsService {
       const has = reserved.get(line.id) ?? dec(0);
       const asked = wanted?.get(line.id);
       if (wanted && !asked) continue;
-      const free = await this.stock.lockFreeQty(tx, line.itemId);
+      const free = totalFree(
+        await this.stock.lockFamilyFree(tx, line.item.familyId),
+      );
       let qty = toReserve(line, has, free);
       if (asked) {
         const waiting = waitingQty(line, has);
@@ -680,15 +880,18 @@ export class MrnsService {
         qty = asked;
       }
       if (!qty.gt(0)) continue;
-      await this.stock.reserve(tx, {
+      const taken = await this.stock.reserveFromFamily(tx, {
         source: 'MRN',
         sourceId: mrnId,
         sourceLineId: line.id,
-        itemId: line.itemId,
+        familyId: line.item.familyId,
         qty,
+        exact: true,
       });
       reserved.set(line.id, has.plus(qty));
-      moves.push({ itemId: line.itemId, qty: qtyString(qty) });
+      for (const t of taken) {
+        moves.push({ itemId: t.itemId, qty: qtyString(t.qty) });
+      }
     }
     return {
       anyWaiting: lines.some((l) =>
@@ -748,13 +951,10 @@ export class MrnsService {
         lines: { select: { id: true, qtyIssued: true } },
       },
     });
-    if (!before) notFound('Request not found.');
+    if (!before) notFound('MRN not found.');
     this.guard('cancel', before, version);
     if (before.lines.some((l) => dec(l.qtyIssued).gt(0))) {
-      conflict(
-        'INVALID_STATE',
-        'Stock has already been issued on this request.',
-      );
+      conflict('INVALID_STATE', 'Stock has already been issued on this MRN.');
     }
     await this.prisma.$transaction(async (tx) => {
       await this.claim(tx, id, 'cancel', version, policy.userId, {
@@ -766,10 +966,7 @@ export class MrnsService {
         where: { mrnId: id, status: { in: ['ISSUED', 'SIGNED'] } },
       });
       if (issued > 0) {
-        conflict(
-          'INVALID_STATE',
-          'Stock has already been issued on this request.',
-        );
+        conflict('INVALID_STATE', 'Stock has already been issued on this MRN.');
       }
       const aods = await this.cancelPicking(tx, id, policy.userId);
       const released = await this.releaseAll(tx, before.lines);
@@ -796,7 +993,7 @@ export class MrnsService {
       where: { id },
       select: { status: true, version: true },
     });
-    if (!before) notFound('Request not found.');
+    if (!before) notFound('MRN not found.');
     this.guard('short_close', before, input.version);
     await this.prisma.$transaction(async (tx) => {
       await this.claim(tx, id, 'short_close', input.version, policy.userId, {
@@ -847,12 +1044,15 @@ export class MrnsService {
     userId: string,
   ): Promise<number> {
     const picking = await tx.aod.findMany({
-      where: { mrnId, status: 'PICKING' },
-      select: { id: true },
+      where: { mrnId, status: { in: UNISSUED_AOD_STATUSES } },
+      select: { id: true, status: true },
     });
     if (picking.length === 0) return 0;
     await tx.aod.updateMany({
-      where: { id: { in: picking.map((a) => a.id) }, status: 'PICKING' },
+      where: {
+        id: { in: picking.map((a) => a.id) },
+        status: { in: UNISSUED_AOD_STATUSES },
+      },
       data: {
         status: 'CANCELLED',
         version: { increment: 1 },
@@ -866,7 +1066,7 @@ export class MrnsService {
           aod.id,
           'cancelled',
           { status: 'CANCELLED' },
-          { before: { status: 'PICKING' }, reason: 'Request closed' },
+          { before: { status: aod.status }, reason: 'MRN closed' },
         ),
         tx,
       );
@@ -1055,6 +1255,47 @@ export class MrnsService {
   }
 }
 
+interface BundlePlan {
+  bundleId: string | null;
+  name: string;
+  qtySets: number;
+  lines: { itemId: string; qtyPerSet: string; qtyRequested: string }[];
+}
+
+/** Bundle parts take line numbers 1001+, 2001+ … so loose lines keep 1..n. */
+const BUNDLE_LINE_BLOCK = 1000;
+
+/** Replaces the MRN's bundles (only while it is a draft, so nothing is reserved yet). */
+async function writeBundles(
+  tx: TransactionClient,
+  mrnId: string,
+  plans: readonly BundlePlan[],
+): Promise<void> {
+  await tx.mrnBundle.deleteMany({ where: { mrnId } });
+  for (const [b, plan] of plans.entries()) {
+    const bundle = await tx.mrnBundle.create({
+      data: {
+        mrnId,
+        lineNo: b + 1,
+        bundleId: plan.bundleId,
+        name: plan.name,
+        qtySets: plan.qtySets,
+      },
+      select: { id: true },
+    });
+    await tx.mrnLine.createMany({
+      data: plan.lines.map((l, j) => ({
+        mrnId,
+        mrnBundleId: bundle.id,
+        lineNo: (b + 1) * BUNDLE_LINE_BLOCK + j + 1,
+        itemId: l.itemId,
+        qtyPerSet: l.qtyPerSet,
+        qtyRequested: l.qtyRequested,
+      })),
+    });
+  }
+}
+
 interface LinePlan {
   id: string | null;
   lineNo: number;
@@ -1085,7 +1326,7 @@ async function replaceLines(
     await tx.mrnLine.deleteMany({ where: { id: { in: dropped } } });
   }
   // Line numbers are unique per request, so park the kept ones out of the way first.
-  await tx.$executeRaw`UPDATE inventory.mrn_line SET line_no = -line_no WHERE mrn_id = ${mrnId}::uuid`;
+  await tx.$executeRaw`UPDATE inventory.mrn_line SET line_no = -line_no WHERE mrn_id = ${mrnId}::uuid AND mrn_bundle_id IS NULL`;
   const fresh: Prisma.MrnLineCreateManyInput[] = [];
   for (const p of plan) {
     const data = {

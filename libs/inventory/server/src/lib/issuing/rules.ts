@@ -14,7 +14,13 @@ export type MrnStatus =
   | 'CLOSED'
   | 'SHORT_CLOSED'
   | 'CANCELLED';
-export type AodStatus = 'PICKING' | 'ISSUED' | 'SIGNED' | 'CANCELLED';
+export type AodStatus =
+  | 'PICKING'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'ISSUED'
+  | 'SIGNED'
+  | 'CANCELLED';
 
 export type MrnAction =
   | 'edit'
@@ -25,7 +31,15 @@ export type MrnAction =
   | 'short_close'
   | 'pick'
   | 'issue';
-export type AodAction = 'edit' | 'issue' | 'cancel' | 'sign';
+export type AodAction =
+  | 'edit'
+  | 'submit'
+  | 'withdraw'
+  | 'approve'
+  | 'reject'
+  | 'issue'
+  | 'cancel'
+  | 'sign';
 
 export const MRN_ALLOWED_FROM: Record<MrnAction, MrnStatus[]> = {
   edit: ['DRAFT'],
@@ -40,10 +54,21 @@ export const MRN_ALLOWED_FROM: Record<MrnAction, MrnStatus[]> = {
 
 export const AOD_ALLOWED_FROM: Record<AodAction, AodStatus[]> = {
   edit: ['PICKING'],
-  issue: ['PICKING'],
-  cancel: ['PICKING'],
+  submit: ['PICKING'],
+  withdraw: ['PENDING_APPROVAL'],
+  approve: ['PENDING_APPROVAL'],
+  reject: ['PENDING_APPROVAL'],
+  issue: ['APPROVED'],
+  cancel: ['PICKING', 'PENDING_APPROVAL', 'APPROVED'],
   sign: ['ISSUED'],
 };
+
+/** Not yet issued: at most one per request, and cancelled with it. */
+export const UNISSUED_AOD_STATUSES: AodStatus[] = [
+  'PICKING',
+  'PENDING_APPROVAL',
+  'APPROVED',
+];
 
 export const OPEN_MRN_STATUSES: MrnStatus[] = [
   'SUBMITTED',
@@ -52,24 +77,30 @@ export const OPEN_MRN_STATUSES: MrnStatus[] = [
   'PARTLY_ISSUED',
   'ISSUED',
 ];
-export const OPEN_AOD_STATUSES: AodStatus[] = ['PICKING', 'ISSUED'];
+export const OPEN_AOD_STATUSES: AodStatus[] = [
+  ...UNISSUED_AOD_STATUSES,
+  'ISSUED',
+];
 
 const MRN_REFUSALS: Record<MrnAction, string> = {
-  edit: 'Only a draft request can be changed.',
-  submit: 'Only a draft request can be submitted.',
-  check: 'Only a submitted request can be checked.',
-  allocate:
-    'Stock can only be assigned to a checked request that is still open.',
-  cancel: 'Only a request with nothing issued can be cancelled.',
-  short_close: 'Only a checked request that is still open can be closed short.',
-  pick: 'Check the request before picking its stock.',
-  issue: 'This request is no longer open for issuing.',
+  edit: 'Only a draft MRN can be changed.',
+  submit: 'Only a draft MRN can be submitted.',
+  check: 'Only a submitted MRN can be checked.',
+  allocate: 'Stock can only be assigned to a checked MRN that is still open.',
+  cancel: 'Only an MRN with nothing issued can be cancelled.',
+  short_close: 'Only a checked MRN that is still open can be closed short.',
+  pick: 'Check the MRN before picking its stock.',
+  issue: 'This MRN is no longer open for issuing.',
 };
 
 const AOD_REFUSALS: Record<AodAction, string> = {
   edit: 'Only an AOD that is still being picked can be changed.',
-  issue: 'This AOD has already been issued or cancelled.',
-  cancel: 'Only an AOD that is still being picked can be cancelled.',
+  submit: 'Only an AOD that is still being picked can be sent for approval.',
+  withdraw: 'Only an AOD waiting for approval can be taken back.',
+  approve: 'Only an AOD waiting for approval can be approved.',
+  reject: 'Only an AOD waiting for approval can be rejected.',
+  issue: 'Only an approved AOD can be issued.',
+  cancel: 'An AOD that has been issued cannot be cancelled.',
   sign: 'Only an issued AOD awaiting its signed copy can be signed.',
 };
 
@@ -90,7 +121,7 @@ export function assertHoldActive(status: HoldStatus): void {
     conflict(
       'INVALID_STATE',
       status === 'CONVERTED'
-        ? 'This hold has already been turned into a request.'
+        ? 'This hold has already been turned into an MRN.'
         : 'This hold has already been released.',
     );
   }

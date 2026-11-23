@@ -1,0 +1,73 @@
+enum StockLayerSource {
+  GRN
+  OPENING
+  RETURN
+  COUNT
+  OTHER
+
+  @@schema("inventory")
+}
+
+/// Shelf stock of one item that arrived together, oldest used first. Only StockPostingService writes it.
+model StockLayer {
+  id        String           @id @default(uuid(7)) @db.Uuid
+  storeId   String           @map("store_id") @db.Uuid
+  itemId    String           @map("item_id") @db.Uuid
+  item      Item             @relation(fields: [itemId], references: [id])
+  /// When its age clock started; a return shifts it forward by the days the part was out.
+  agedFrom  DateTime         @map("aged_from") @db.Timestamptz(3)
+  /// Opening stock: the real arrival date is unknown, so the age is a minimum.
+  atLeast   Boolean          @default(false) @map("at_least")
+  source    StockLayerSource
+  docType   String           @map("doc_type")
+  docId     String           @map("doc_id") @db.Uuid
+  docLineId String?          @map("doc_line_id") @db.Uuid
+  docNumber String?          @map("doc_number")
+  qtyIn     Decimal          @map("qty_in") @db.Decimal(14, 3)
+  qtyLeft   Decimal          @map("qty_left") @db.Decimal(14, 3)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  uses      StockLayerUse[]
+
+  @@index([storeId, itemId, agedFrom])
+  @@index([docId])
+  @@map("stock_layer")
+  @@schema("inventory")
+}
+
+/// Stock taken off a layer: how much, by which document, and how long it had been on the shelf.
+model StockLayerUse {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  layerId     String       @map("layer_id") @db.Uuid
+  layer       StockLayer   @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  itemId      String       @map("item_id") @db.Uuid
+  ledgerId    String       @map("ledger_id") @db.Uuid
+  movement    MovementType
+  docType     String       @map("doc_type")
+  docId       String       @map("doc_id") @db.Uuid
+  docLineId   String?      @map("doc_line_id") @db.Uuid
+  docNumber   String?      @map("doc_number")
+  qty         Decimal      @db.Decimal(14, 3)
+  /// Brought back on a return; it is back on the shelf in a new layer.
+  returnedQty Decimal      @default(0) @map("returned_qty") @db.Decimal(14, 3)
+  usedAt      DateTime     @map("used_at") @db.Timestamptz(3)
+  daysInStore Int          @map("days_in_store")
+
+  @@index([itemId, usedAt])
+  @@index([docLineId])
+  @@map("stock_layer_use")
+  @@schema("inventory")
+}
+
+/// One row (id 1): the upper day limits of the stock age bands; the last band is everything older.
+model StockAgeSettings {
+  id        Int      @id @default(1)
+  bands     Int[]    @default([30, 90, 180, 365])
+  version   Int      @default(1)
+  /// When the layers were last rebuilt from the stock ledger; null asks the worker to rebuild them.
+  rebuiltAt DateTime? @map("rebuilt_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  @@map("stock_age_settings")
+  @@schema("inventory")
+}

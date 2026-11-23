@@ -13,6 +13,7 @@ import {
   BarcodeInput,
   type CodeKind,
   type PhoneScanCode,
+  type PhoneScanPcCode,
   type PhoneScanLink,
   type PhoneScanPair,
   type PhoneScanPaired,
@@ -478,7 +479,31 @@ export class PhoneScanService implements OnModuleInit {
       return ended;
     }
     if (!can(policy, 'inventory.item.view')) return ended;
+    return this.addScan(row, policy, input.code, input.format, now);
+  }
 
+  /** The PC adds to its own list with its camera or a hand-held scanner. */
+  async scanFromPc(
+    policy: Policy,
+    id: string,
+    input: PhoneScanPcCode,
+    now = new Date(),
+  ): Promise<PhoneScanReply> {
+    const row = await this.closeIfExpired(await this.own(policy, id), now);
+    if (row.status !== 'WAITING' && row.status !== 'PAIRED') {
+      return { result: 'ended', line: null, expiresAt: null };
+    }
+    return this.addScan(row, policy, input.code, input.format, now);
+  }
+
+  private async addScan(
+    row: Session,
+    policy: Policy,
+    code: string,
+    format: string | undefined,
+    now: Date,
+  ): Promise<PhoneScanReply> {
+    const input = { code, format };
     const found = await this.scans.resolve(policy, input.code);
     const expiresAt = row.expiresAt.toISOString();
     if (found.type === 'bin') return { result: 'bin', line: null, expiresAt };

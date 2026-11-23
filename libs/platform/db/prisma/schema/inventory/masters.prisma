@@ -55,11 +55,11 @@ model MachineModel {
   brand         Brand?             @relation(fields: [brandId], references: [id])
   machineTypeId String?            @map("machine_type_id") @db.Uuid
   machineType   MachineType?       @relation(fields: [machineTypeId], references: [id], onDelete: SetNull)
-  active    Boolean            @default(true)
-  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
-  items     ItemMachineModel[]
-  warranty  WarrantyTag[]
+  active        Boolean            @default(true)
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  items         ItemMachineModel[]
+  warranty      WarrantyTag[]
 
   @@map("machine_model")
   @@schema("inventory")
@@ -80,6 +80,12 @@ model Item {
   supersededById String?            @map("superseded_by_id") @db.Uuid
   supersededBy   Item?              @relation("Supersession", fields: [supersededById], references: [id])
   supersedes     Item[]             @relation("Supersession")
+  /// The family's current item: the end of the supersession chain (itself when not superseded).
+  familyId       String             @default(dbgenerated()) @map("family_id") @db.Uuid
+  family         Item               @relation("Family", fields: [familyId], references: [id])
+  familyMembers  Item[]             @relation("Family")
+  /// Steps to the current item; higher is older, 0 is current.
+  familyDepth    Int                @default(0) @map("family_depth")
   status         ItemStatus         @default(ACTIVE)
   qrToken        String             @unique @map("qr_token")
   notes          String?
@@ -109,11 +115,17 @@ model Item {
   countLines     CountLine[]
   warrantyTags   WarrantyTag[]
   phoneScans     PhoneScanLine[]
+  lowStockAlerts LowStockAlert[]
+  stockLayers    StockLayer[]
+  serials        ItemSerial[]
+  customerParts  CustomerPart[]
+  bundleLines    BundleLine[]
 
   @@unique([brandId, partNoNorm])
   @@index([partNoNorm])
   @@index([supplierId])
   @@index([status])
+  @@index([familyId])
   @@map("item")
   @@schema("inventory")
 }
@@ -144,13 +156,14 @@ model ItemBarcode {
 }
 
 model Store {
-  id       String         @id @default(uuid(7)) @db.Uuid
-  code     String         @unique
+  id       String          @id @default(uuid(7)) @db.Uuid
+  code     String          @unique
   name     String
-  active   Boolean        @default(true)
+  active   Boolean         @default(true)
   zones    Zone[]
   bins     Bin[]
   balances StockBalance[]
+  lowStock LowStockAlert[]
 
   @@map("store")
   @@schema("inventory")
@@ -193,6 +206,7 @@ model Bin {
   updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   updatedBy    String        @map("updated_by") @db.Uuid
   stock        BinStock[]
+  serials      ItemSerial[]
   ledger       StockLedger[]
   aodLines     AodLine[]
   defaultItems Item[]

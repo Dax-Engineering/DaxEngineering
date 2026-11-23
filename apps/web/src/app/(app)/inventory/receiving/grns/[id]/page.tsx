@@ -21,6 +21,7 @@ import {
   SectionCard,
 } from '@dax/web-shell';
 import { LinkButton } from '../../../../../../components/links';
+import { SerialLabelsButton } from '../../../../../../components/serial-labels';
 import {
   formatDateTime,
   formatDay,
@@ -88,7 +89,59 @@ function LineFlags({ line }: { line: GrnLine }) {
   );
 }
 
-function PostedLines({ grn }: { grn: GrnDto }) {
+const SHOWN_SERIALS = 8;
+
+/** A line's serials as links, and its label button. */
+function LineSerials({
+  line,
+  canPrint,
+}: {
+  line: GrnLine & { grnId: string };
+  canPrint: boolean;
+}) {
+  if (line.serials.length === 0) return null;
+  const shown = line.serials.slice(0, SHOWN_SERIALS);
+  const more = line.serials.length - shown.length;
+  const unprinted = line.serials.filter(
+    (s) => s.status === 'ACTIVE' && s.printCount === 0,
+  ).length;
+  return (
+    <div className="dax-serials">
+      <span className="dax-chips" style={{ gap: 4 }}>
+        {shown.map((s) => (
+          <Link
+            key={s.id}
+            href={`/inventory/serials/${s.serial}`}
+            className={s.status === 'VOID' ? 'dax-serial void' : 'dax-serial'}
+            title={s.condition === 'DAMAGED' ? 'Damaged' : undefined}
+          >
+            <Mono>{s.serial}</Mono>
+            {s.condition === 'DAMAGED' ? ' · damaged' : ''}
+          </Link>
+        ))}
+        {more > 0 ? (
+          <Link
+            href={`/inventory/items/${line.item.id}#serials`}
+            className="dax-link"
+          >
+            +{more} more
+          </Link>
+        ) : null}
+      </span>
+      {canPrint && line.serials.some((s) => s.status === 'ACTIVE') ? (
+        <SerialLabelsButton
+          scope={{ grnId: line.grnId, grnLineId: line.id }}
+          label={unprinted ? `Print ${unprinted} labels` : 'Reprint labels'}
+          count={line.serials.length}
+          unprintedOnly={unprinted > 0}
+          size="xs"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function PostedLines({ grn, canPrint }: { grn: GrnDto; canPrint: boolean }) {
   return (
     <>
       <Box visibleFrom="md">
@@ -114,6 +167,10 @@ function PostedLines({ grn }: { grn: GrnDto }) {
                     <Mono>{line.item.partNo}</Mono>
                   </Link>
                   <span className="dax-sub">{line.item.description}</span>
+                  <LineSerials
+                    line={{ ...line, grnId: grn.id }}
+                    canPrint={canPrint}
+                  />
                 </TableTd>
                 <TableTd className="dax-num">
                   {line.qtyExpected ? formatQty(line.qtyExpected) : '—'}
@@ -157,6 +214,10 @@ function PostedLines({ grn }: { grn: GrnDto }) {
               </span>
               <PutAwayProgress line={line} />
               <LineFlags line={line} />
+              <LineSerials
+                line={{ ...line, grnId: grn.id }}
+                canPrint={canPrint}
+              />
             </div>
           </div>
         ))}
@@ -180,6 +241,18 @@ export default async function GrnPage({
   const posted = grn.status === 'POSTED' || grn.status === 'PUT_AWAY';
   const waiting = grn.lines.filter((l) => qtyNumber(l.toPutAway) > 0).length;
   const title = grn.number ? <Mono>{grn.number}</Mono> : 'Draft GRN';
+  const canPrint =
+    can('inventory.grn.post') ||
+    can('inventory.grn.putaway') ||
+    can('inventory.item.print_label');
+  const serialCount = grn.lines.reduce((n, l) => n + l.serials.length, 0);
+  const unprinted = grn.lines.reduce(
+    (n, l) =>
+      n +
+      l.serials.filter((s) => s.status === 'ACTIVE' && s.printCount === 0)
+        .length,
+    0,
+  );
 
   return (
     <>
@@ -187,7 +260,7 @@ export default async function GrnPage({
         back={{ href: BASE, label: 'Receiving' }}
         eyebrow={
           <>
-            Goods received · {SUBTYPE_LABELS[grn.subtype]} · Started{' '}
+            GRN · {SUBTYPE_LABELS[grn.subtype]} · Started{' '}
             {formatDateTime(grn.createdAt)}
           </>
         }
@@ -203,6 +276,19 @@ export default async function GrnPage({
                 id={grn.id}
                 version={grn.version}
                 number={grn.number ?? 'this GRN'}
+              />
+            ) : null}
+            {posted && canPrint && serialCount > 0 ? (
+              <SerialLabelsButton
+                scope={{ grnId: grn.id }}
+                label={
+                  unprinted
+                    ? `Print ${unprinted} serial labels`
+                    : 'Reprint serial labels'
+                }
+                count={serialCount}
+                unprintedOnly={unprinted > 0}
+                size="md"
               />
             ) : null}
             {grn.status === 'POSTED' &&
@@ -241,7 +327,7 @@ export default async function GrnPage({
         <GrnDock key={grn.version} grn={grn} canPost={canPost} />
       ) : (
         <>
-          <SectionCard title="Delivery">
+          <SectionCard title="GRN details">
             <Facts
               items={[
                 {
@@ -281,7 +367,7 @@ export default async function GrnPage({
             }
           >
             {grn.lines.length ? (
-              <PostedLines grn={grn} />
+              <PostedLines grn={grn} canPrint={canPrint && posted} />
             ) : (
               <div className="dax-card-body">
                 <Empty title="No lines" />

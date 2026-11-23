@@ -99,17 +99,17 @@ export function ConvertHoldButton({
   const field = (key: string) => state.fields?.[key];
   return (
     <>
-      <Button onClick={() => setOpened(true)}>Turn into a request</Button>
+      <Button onClick={() => setOpened(true)}>Turn into an MRN</Button>
       <Modal
         opened={opened}
         onClose={() => setOpened(false)}
-        title="Turn this hold into a request"
+        title="Turn this hold into an MRN"
         centered
       >
         <Stack>
           <Text size="sm">
-            Every held line moves to a new request, already reserved. The whole
-            hold converts at once.
+            Every held line moves to a new MRN, already reserved. The whole hold
+            converts at once.
           </Text>
           <SegmentedControl
             fullWidth
@@ -167,7 +167,7 @@ export function ConvertHoldButton({
                 })
               }
             >
-              Create request
+              Raise MRN
             </Button>
           </Group>
         </Stack>

@@ -69,7 +69,7 @@ export default async function HoldPage({
             ...(hold.convertedMrn
               ? [
                   {
-                    label: 'Turned into request',
+                    label: 'Turned into MRN',
                     value: (
                       <Link
                         href={mrnPath(hold.convertedMrn.id)}

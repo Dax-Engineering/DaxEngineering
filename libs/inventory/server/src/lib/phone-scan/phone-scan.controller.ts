@@ -19,6 +19,7 @@ import {
   PhoneScanLineUpdate,
   PhoneScanLink,
   PhoneScanPair,
+  PhoneScanPcCode,
   type PhoneScanPaired,
   type PhoneScanReply,
   type PhoneScanStart,
@@ -104,6 +105,22 @@ export class PhoneScanController {
     @Param('lineId', ParseUUIDPipe) lineId: string,
   ): Promise<PhoneScanView> {
     return this.phone.removeLine(sessionOf(req).policy, id, lineId);
+  }
+
+  @Post(':id/scan')
+  @Requires('inventory.item.view')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  scanFromPc(
+    @Req() req: DaxRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ): Promise<PhoneScanReply> {
+    return this.phone.scanFromPc(
+      sessionOf(req).policy,
+      id,
+      parse(PhoneScanPcCode, body),
+    );
   }
 
   @Get(':id/lines/:lineId/suggest')

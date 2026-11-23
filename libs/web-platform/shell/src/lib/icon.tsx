@@ -258,6 +258,12 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M10 13h4" />
     </>
   ),
+  bell: (
+    <>
+      <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2H4.5z" />
+      <path d="M10 20.5a2 2 0 0 0 4 0" />
+    </>
+  ),
   mail: (
     <>
       <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />

@@ -21,7 +21,7 @@ function FreeHint({ line }: { line: RequestLine }) {
   const free = qtyNumber(line.part.free);
   const want = qtyNumber(line.qty);
   if (free <= 0)
-    return <Pill tone="bad">None free now · the request will wait</Pill>;
+    return <Pill tone="bad">None free now · the MRN will wait</Pill>;
   if (want > free)
     return (
       <Pill tone="yel">
@@ -37,12 +37,18 @@ export function RequestLines({
   errors,
   withNotes = false,
   title = 'Parts',
+  qtyLabel = 'Quantity',
+  emptyText = 'Scan or search for each part needed.',
+  missingText = 'Add at least one part.',
 }: {
   lines: RequestLine[];
   onChange: (lines: RequestLine[]) => void;
   errors: (key: string) => string | undefined;
   withNotes?: boolean;
   title?: string;
+  qtyLabel?: string;
+  emptyText?: string;
+  missingText?: string;
 }) {
   function addPart(part: PartRef): string {
     const existing = lines.find((l) => l.part.id === part.id);
@@ -77,7 +83,7 @@ export function RequestLines({
         </Text>
       </Group>
       {lines.length === 0 ? (
-        <Empty title="No parts yet">Scan or search for each part needed.</Empty>
+        <Empty title="No parts yet">{emptyText}</Empty>
       ) : (
         lines.map((line, i) => (
           <div key={line.key} className="dax-line">
@@ -103,7 +109,7 @@ export function RequestLines({
             </div>
             <div className="dax-steppers">
               <QtyStepper
-                label="Quantity"
+                label={qtyLabel}
                 unit={line.part.uom}
                 value={line.qty}
                 error={errors(`lines.${i}.qty`)}
@@ -131,7 +137,7 @@ export function RequestLines({
       )}
       {errors('lines') ? (
         <Text c="red" size="sm">
-          Add at least one part.
+          {missingText}
         </Text>
       ) : null}
       <Group>

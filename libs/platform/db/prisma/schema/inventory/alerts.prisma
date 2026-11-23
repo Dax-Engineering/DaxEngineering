@@ -1,0 +1,29 @@
+model LowStockAlert {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  itemId    String    @map("item_id") @db.Uuid
+  item      Item      @relation(fields: [itemId], references: [id])
+  storeId   String    @map("store_id") @db.Uuid
+  store     Store     @relation(fields: [storeId], references: [id])
+  openedAt  DateTime  @default(now()) @map("opened_at") @db.Timestamptz(3)
+  clearedAt DateTime? @map("cleared_at") @db.Timestamptz(3)
+
+  @@index([itemId])
+  @@index([storeId, clearedAt])
+  @@map("low_stock_alert")
+  @@schema("inventory")
+}
+
+/// One row (id 1): when the weekly low-stock email goes out, and whether each new low part is emailed at once.
+model LowStockSettings {
+  id            Int       @id @default(1)
+  reportWeekday Int       @default(1) @map("report_weekday")
+  reportTime    String    @default("08:00") @map("report_time")
+  instantEmail  Boolean   @default(false) @map("instant_email")
+  lastReportAt  DateTime? @map("last_report_at") @db.Timestamptz(3)
+  version       Int       @default(1)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedBy     String?   @map("updated_by") @db.Uuid
+
+  @@map("low_stock_settings")
+  @@schema("inventory")
+}

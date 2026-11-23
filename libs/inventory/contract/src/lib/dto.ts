@@ -127,6 +127,25 @@ export const StockFigures = z.object({
 });
 export type StockFigures = z.infer<typeof StockFigures>;
 
+/** Every number of a supersession family, oldest first, with the family's combined stock. */
+export const PartFamily = z.object({
+  stock: StockFigures,
+  members: z.array(
+    z.object({
+      id: z.uuid(),
+      partNo: z.string(),
+      current: z.boolean(),
+      /** The number that superseded this one; null for the current number. */
+      supersededBy: z.string().nullable(),
+      onHand: z.string(),
+      held: z.string(),
+      free: z.string(),
+      receiving: z.string(),
+    }),
+  ),
+});
+export type PartFamily = z.infer<typeof PartFamily>;
+
 export const ItemSummary = z.object({
   id: z.uuid(),
   partNo: z.string(),
@@ -138,6 +157,7 @@ export const ItemSummary = z.object({
   minQty: z.string(),
   stock: StockFigures,
   belowMin: z.boolean(),
+  family: PartFamily,
   supplier: Ref.nullable(),
   tags: z.array(z.string()),
   /** From the machine models the item fits. */
@@ -162,6 +182,14 @@ export const ItemDetail = ItemSummary.extend({
   notes: z.string().nullable(),
   stockByBin: z.array(
     z.object({ binId: z.uuid(), binCode: z.string(), qty: z.string() }),
+  ),
+  /** The part's number at each customer it has been dispatched to; empty when customers are hidden. */
+  customerParts: z.array(
+    z.object({
+      customerId: z.uuid(),
+      customerName: z.string(),
+      partNo: z.string(),
+    }),
   ),
   version: z.int(),
   createdAt: z.string(),
@@ -363,7 +391,15 @@ export const StockRow = z.object({
   stock: StockFigures,
   minQty: z.string(),
   belowMin: z.boolean(),
-  bins: z.array(z.object({ code: z.string(), qty: z.string() })),
+  family: PartFamily,
+  /** `partNo` is set when the bin holds an older number of the family. */
+  bins: z.array(
+    z.object({
+      code: z.string(),
+      qty: z.string(),
+      partNo: z.string().nullable(),
+    }),
+  ),
 });
 export type StockRow = z.infer<typeof StockRow>;
 export const StockPage = pageOf(StockRow);
@@ -394,6 +430,12 @@ export type LabelRequest = z.infer<typeof LabelRequest>;
 export const ScanResult = z.discriminatedUnion('type', [
   z.object({ type: z.literal('item'), id: z.uuid(), path: z.string() }),
   z.object({ type: z.literal('bin'), id: z.uuid(), path: z.string() }),
+  z.object({
+    type: z.literal('serial'),
+    id: z.uuid(),
+    serial: z.string(),
+    path: z.string(),
+  }),
   z.object({
     type: z.literal('choices'),
     items: z.array(
@@ -464,6 +506,9 @@ export const QR_TOKEN_PATTERN = /^[A-Za-z0-9]{12}$/;
 export const InventorySummary = z.object({
   items: z.int(),
   belowMin: z.int(),
+  /** Parts holding shelf stock older than the last age band limit (agedLimit days). */
+  agedOver: z.int(),
+  agedLimit: z.int(),
   inStock: z.int(),
   bins: z.int(),
   zones: z.int(),

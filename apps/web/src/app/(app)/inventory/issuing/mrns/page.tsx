@@ -52,11 +52,11 @@ export default async function MrnListPage({
       <PageHead
         back={{ href: BASE, label: 'Issuing' }}
         eyebrow="Issuing"
-        title="Requests"
-        lede="Material requests from departments. Checking reserves what is free; the rest waits."
+        title="MRNs"
+        lede="Material request notes from departments. Checking reserves what is free; the rest waits."
         actions={
           canDo(caps, 'inventory.mrn.create') ? (
-            <LinkButton href={`${BASE}/mrns/new`}>New request</LinkButton>
+            <LinkButton href={`${BASE}/mrns/new`}>Raise MRN</LinkButton>
           ) : null
         }
       />
@@ -81,7 +81,7 @@ export default async function MrnListPage({
       >
         {page.items.length === 0 ? (
           <CardBody>
-            <Empty title="No requests found">
+            <Empty title="No MRNs found">
               {filtered
                 ? 'Try a different search or filter.'
                 : 'Nothing is open right now.'}

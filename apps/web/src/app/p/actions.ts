@@ -47,7 +47,8 @@ export async function pairPhone(scanned: string): Promise<PairResult> {
   if (!pair) {
     return {
       ok: false,
-      message: 'That is not the PC code. On the PC, open "Scan with phone".',
+      message:
+        'That is not the PC code. On the PC, press Scan, then Scan with External Phone.',
     };
   }
   let result: PhoneScanPaired;

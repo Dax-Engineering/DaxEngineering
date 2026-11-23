@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { normalizePartNo, type ScanResult } from '@dax/inventory-contract';
+import {
+  looksLikeSerial,
+  normalizePartNo,
+  normalizeSerial,
+  type ScanResult,
+} from '@dax/inventory-contract';
 import { can, type Policy } from '@dax/platform-core';
 import { PrismaService } from '@dax/platform-db';
 import { extractGtin, gtinForms } from './phone-scan/barcode-info';
@@ -11,6 +16,7 @@ const MAX_CHOICES = 20;
 
 export const itemPath = (id: string) => `/inventory/items/${id}`;
 export const binPath = (id: string) => `/inventory/locations/bins/${id}`;
+export const serialPath = (serial: string) => `/inventory/serials/${serial}`;
 
 @Injectable()
 export class ScanService {
@@ -25,6 +31,16 @@ export class ScanService {
     if (code.kind === 'qr') return this.byToken(policy, code.type, code.token);
 
     const value = code.value;
+    if (looksLikeSerial(value) && can(policy, 'inventory.item.view')) {
+      const serial = normalizeSerial(value);
+      const hit = await this.prisma.itemSerial.findUnique({
+        where: { serial },
+        select: { id: true },
+      });
+      if (hit) {
+        return { type: 'serial', id: hit.id, serial, path: serialPath(serial) };
+      }
+    }
     if (code.maybeToken) {
       const hit = await this.findToken(value);
       if (hit) return this.allowed(policy, hit.type, hit.id);

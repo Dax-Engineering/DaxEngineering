@@ -5,8 +5,8 @@ import {
   BinStockReport,
   MovementReportPage,
   MovementReportQuery,
-  SlowMovingQuery,
-  SlowMovingReport,
+  StockAgeQuery,
+  StockAgeReport,
 } from '@dax/inventory-contract';
 import { load } from '../../../../../lib/load';
 import { type Query, readQuery, toQuery } from '../../../../../lib/query';
@@ -36,11 +36,11 @@ export function getStockByBin(raw: Query) {
   );
 }
 
-export function getSlowMoving(raw: Query) {
+export function getStockAge(raw: Query) {
   return load(
     api.request(
-      `${API}/slow-moving${toQuery(readQuery(SlowMovingQuery, raw))}`,
-      (d) => SlowMovingReport.parse(d),
+      `${API}/stock-age${toQuery(readQuery(StockAgeQuery, raw))}`,
+      (d) => StockAgeReport.parse(d),
     ),
   );
 }

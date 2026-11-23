@@ -14,3 +14,5 @@ export {
   type GateMrn,
   type MrnReleaseGate,
 } from './lib/issuing/shared';
+export * from './lib/low-stock/events';
+export { LowStockJobs } from './lib/low-stock/low-stock.jobs';

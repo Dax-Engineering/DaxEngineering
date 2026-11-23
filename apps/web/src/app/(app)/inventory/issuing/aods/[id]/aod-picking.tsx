@@ -16,7 +16,13 @@ import {
   TextInput,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { startTransition, useActionState, useMemo, useState } from 'react';
+import {
+  Fragment,
+  startTransition,
+  useActionState,
+  useMemo,
+  useState,
+} from 'react';
 import type { AodDto } from '@dax/inventory-contract';
 import {
   Icon,
@@ -41,15 +47,23 @@ import {
 } from '../../../receiving/_lib/lines';
 import { QtyStepper } from '../../../receiving/_lib/qty-stepper';
 import { aodStep, identifyCode } from '../../_lib/actions';
+import { BundleHead, setsText } from '../../_lib/bundle-groups';
 import { AOD_TYPE_OPTIONS, type AodType } from '../../_lib/labels';
 
-export type BinStock = { id: string; code: string; qty: string };
+export type BinStock = {
+  id: string;
+  code: string;
+  qty: string;
+  itemId: string;
+};
 
 interface PickLine {
   key: string;
   id?: string;
   mrnLineId: string;
+  bundleId: string | null;
   item: AodDto['lines'][number]['item'];
+  requestedItem: AodDto['lines'][number]['requestedItem'];
   reserved: string;
   bin: { id: string; code: string } | null;
   qty: string;
@@ -62,7 +76,9 @@ function toPickLine(line: AodDto['lines'][number]): PickLine {
     key: line.id,
     id: line.id,
     mrnLineId: line.mrnLineId,
+    bundleId: line.bundleId,
     item: line.item,
+    requestedItem: line.requestedItem,
     reserved: line.reservedForLine,
     bin: line.bin,
     qty: trimQty(line.qty),
@@ -161,6 +177,11 @@ function LineCard({
           </span>{' '}
           <span className="dax-muted">{line.item.brand}</span>
           <span className="dax-sub">{line.item.description}</span>
+          {line.requestedItem ? (
+            <span className="dax-sub">
+              Supplied for <Mono>{line.requestedItem.partNo}</Mono>
+            </span>
+          ) : null}
           <span className="dax-sub">
             Reserved for this line <b>{formatQty(line.reserved)}</b>{' '}
             {line.item.uom}
@@ -258,6 +279,10 @@ export function AodPicking({
   const [lines, setLines] = useState<PickLine[]>(() =>
     aod.lines.map(toPickLine),
   );
+  const bundles = useMemo(
+    () => new Map(aod.bundles.map((b) => [b.id, b])),
+    [aod.bundles],
+  );
   const [scanning, setScanning] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const phone = useMediaQuery('(max-width: 48em)');
@@ -272,6 +297,7 @@ export function AodPicking({
       lines: lines.map((l) => ({
         id: l.id,
         mrnLineId: l.mrnLineId,
+        itemId: l.item.id,
         binId: l.bin?.id ?? null,
         qty: l.qty.trim(),
         scanned: scanned(l),
@@ -328,7 +354,7 @@ export function AodPicking({
     });
   }
 
-  function send(step: 'save' | 'issue') {
+  function send(step: 'save' | 'submit') {
     startTransition(() =>
       dispatch({
         id: aod.id,
@@ -344,10 +370,10 @@ export function AodPicking({
 
   return (
     <Stack gap="lg">
-      <SectionCard title="Dispatch">
+      <SectionCard title="AOD details">
         <SimpleGrid cols={{ base: 1, sm: 3 }}>
           <Select
-            label="Dispatch type"
+            label="AOD type"
             data={AOD_TYPE_OPTIONS}
             value={type}
             onChange={(v) => {
@@ -396,27 +422,42 @@ export function AodPicking({
             const left = round3(
               qtyNumber(line.reserved) - picked(line.mrnLineId, line.key),
             );
+            const bundle =
+              line.bundleId && lines[i - 1]?.bundleId !== line.bundleId
+                ? bundles.get(line.bundleId)
+                : undefined;
             return (
-              <LineCard
-                key={line.key}
-                line={line}
-                bins={binsByLine[line.mrnLineId] ?? []}
-                max={Math.max(0, left)}
-                error={lineError(line, i)}
-                onChange={(change) => patch(line.key, change)}
-                onScan={() => setScanning(line.key)}
-                onSplit={
-                  qtyNumber(line.reserved) > 1 ? () => split(line) : null
-                }
-                onRemove={
-                  sameLine(line) > 1
-                    ? () =>
-                        setLines((prev) =>
-                          prev.filter((l) => l.key !== line.key),
-                        )
-                    : null
-                }
-              />
+              <Fragment key={line.key}>
+                {bundle ? (
+                  <BundleHead bundle={bundle}>
+                    <span className="dax-muted">
+                      {setsText(bundle.sets)} · pick whole sets only
+                    </span>
+                  </BundleHead>
+                ) : null}
+                <LineCard
+                  key={line.key}
+                  line={line}
+                  bins={(binsByLine[line.mrnLineId] ?? []).filter(
+                    (b) => b.itemId === line.item.id,
+                  )}
+                  max={Math.max(0, left)}
+                  error={lineError(line, i)}
+                  onChange={(change) => patch(line.key, change)}
+                  onScan={() => setScanning(line.key)}
+                  onSplit={
+                    qtyNumber(line.reserved) > 1 ? () => split(line) : null
+                  }
+                  onRemove={
+                    sameLine(line) > 1
+                      ? () =>
+                          setLines((prev) =>
+                            prev.filter((l) => l.key !== line.key),
+                          )
+                      : null
+                  }
+                />
+              </Fragment>
             );
           })}
         </Stack>
@@ -449,7 +490,7 @@ export function AodPicking({
           disabled={invalid || noBin || lines.length === 0}
           onClick={() => setConfirming(true)}
         >
-          Issue
+          Send for approval
         </Button>
       </div>
 
@@ -470,20 +511,20 @@ export function AodPicking({
         ) : null}
       </Modal>
 
-      <IssueDialog
+      <SubmitDialog
         opened={confirming}
         onClose={() => setConfirming(false)}
         lines={lines.length}
         unscanned={unscanned}
         pending={pending}
         state={state}
-        onConfirm={() => send('issue')}
+        onConfirm={() => send('submit')}
       />
     </Stack>
   );
 }
 
-function IssueDialog({
+function SubmitDialog({
   opened,
   onClose,
   lines,
@@ -501,17 +542,25 @@ function IssueDialog({
   onConfirm: () => void;
 }) {
   return (
-    <Modal opened={opened} onClose={onClose} title="Issue this AOD?" centered>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="Send this AOD for approval?"
+      centered
+    >
       <Stack>
         <List size="sm" spacing={6}>
           <ListItem>
-            The stock on {lines} {lines === 1 ? 'pick' : 'picks'} leaves its
-            bins now.
+            The department head gets it in their inbox. Until they approve, only
+            Stores and the approvers can see it.
           </ListItem>
-          <ListItem>The AOD gets its number.</ListItem>
           <ListItem>
-            Print it, have it signed on delivery and upload the signed copy to
-            complete it.
+            The {lines} {lines === 1 ? 'pick stays' : 'picks stay'} reserved; no
+            stock leaves yet.
+          </ListItem>
+          <ListItem>
+            Once approved, issue it here. It then gets its number and can be
+            printed.
           </ListItem>
         </List>
         {unscanned ? (
@@ -526,7 +575,7 @@ function IssueDialog({
             Not yet
           </Button>
           <Button color="ember" loading={pending} onClick={onConfirm}>
-            Issue AOD
+            Send for approval
           </Button>
         </Group>
       </Stack>

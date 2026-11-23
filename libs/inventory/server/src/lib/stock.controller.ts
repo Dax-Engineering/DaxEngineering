@@ -8,12 +8,13 @@ import {
   belowMinFilter,
   belowMinIds,
   extrasFilter,
+  familySearch,
+  familySelect,
   ITEM_EXTRAS_SELECT,
   itemExtras,
-  itemSearch,
 } from './item-queries';
 import { MainStore } from './main-store.service';
-import { isBelowMin, qtyString, stockFigures } from './stock-math';
+import { familyFigures, isBelowMin, qtyString } from './stock-math';
 
 @Controller('inventory/stock')
 export class StockController {
@@ -35,11 +36,17 @@ export class StockController {
     };
     const where: Prisma.ItemWhereInput = {
       AND: [
-        { status: 'ACTIVE' },
-        query.zoneId ? { binStock: { some: binFilter } } : {},
-        query.inStock === 'true' ? { balances: { some: inStock } } : {},
-        query.inStock === 'false' ? { balances: { none: inStock } } : {},
-        itemSearch(query.q),
+        { status: 'ACTIVE', supersededById: null },
+        query.zoneId
+          ? { familyMembers: { some: { binStock: { some: binFilter } } } }
+          : {},
+        query.inStock === 'true'
+          ? { familyMembers: { some: { balances: { some: inStock } } } }
+          : {},
+        query.inStock === 'false'
+          ? { familyMembers: { none: { balances: { some: inStock } } } }
+          : {},
+        familySearch(query.q),
         belowMinFilter(query.belowMin, ids),
         extrasFilter(query),
       ],
@@ -63,10 +70,18 @@ export class StockController {
             receiving: true,
           },
         },
-        binStock: {
-          where: binFilter,
-          select: { qty: true, bin: { select: { code: true } } },
-          orderBy: { bin: { code: 'asc' } },
+        family: familySelect(storeId),
+        familyMembers: {
+          select: {
+            id: true,
+            partNo: true,
+            binStock: {
+              where: binFilter,
+              select: { qty: true, bin: { select: { code: true } } },
+              orderBy: { bin: { code: 'asc' } },
+            },
+          },
+          orderBy: [{ familyDepth: 'desc' }, { partNo: 'asc' }],
         },
       },
       orderBy: [{ partNo: 'asc' }, { id: 'asc' }],
@@ -78,7 +93,7 @@ export class StockController {
     ]);
     return {
       items: rows.map((r) => {
-        const { figures, onHand } = stockFigures(r.balances[0]);
+        const family = familyFigures(r.family.familyMembers);
         return {
           item: {
             id: r.id,
@@ -88,13 +103,17 @@ export class StockController {
             uom: r.uom,
           },
           ...itemExtras(r),
-          stock: figures,
+          stock: family.stock,
           minQty: qtyString(r.minQty),
-          belowMin: isBelowMin(onHand, r.minQty),
-          bins: r.binStock.map((b) => ({
-            code: b.bin.code,
-            qty: qtyString(b.qty),
-          })),
+          belowMin: isBelowMin(family.onHand, r.minQty),
+          family: { stock: family.stock, members: family.members },
+          bins: r.familyMembers.flatMap((m) =>
+            m.binStock.map((b) => ({
+              code: b.bin.code,
+              qty: qtyString(b.qty),
+              partNo: m.id === r.id ? null : m.partNo,
+            })),
+          ),
         };
       }),
       ...pageMeta(query, total),

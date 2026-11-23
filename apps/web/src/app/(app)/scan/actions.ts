@@ -40,7 +40,11 @@ export async function scanCode(raw: string): Promise<ScanOutcome> {
     return { type: 'error', message: 'The lookup failed. Try again.' };
   }
 
-  if (result.type === 'item' || result.type === 'bin') {
+  if (
+    result.type === 'item' ||
+    result.type === 'bin' ||
+    result.type === 'serial'
+  ) {
     const path = safePath(result.path);
     return path ? { type: 'go', path } : { type: 'none' };
   }

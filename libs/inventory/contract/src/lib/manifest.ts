@@ -22,16 +22,43 @@ export const inventoryManifest = defineModule({
       name: 'Brands and machine models',
       actions: { view: {}, manage: {} },
     },
+    bundle: {
+      name: 'Bundles',
+      description:
+        'Saved sets of parts that go out together on an MRN and AOD.',
+      actions: { view: {}, manage: { label: 'Manage bundles' } },
+    },
     location: {
       name: 'Stores, zones and bins',
       actions: { view: {}, manage: {}, print_label: { label: 'Print labels' } },
     },
     stock: { name: 'Stock levels', actions: { view: {}, export: {} } },
+    stock_age: {
+      name: 'Stock age',
+      actions: {
+        settings: {
+          label: 'Change age bands',
+          description:
+            'Sets the day limits of the bands in the Stock age report.',
+        },
+      },
+    },
+    low_stock: {
+      name: 'Low-stock alerts',
+      actions: {
+        email: {
+          label: 'Email low-stock alerts',
+          description:
+            'Department heads with this also get the weekly report and, when switched on, an email per part.',
+        },
+        settings: { label: 'Change low-stock email settings' },
+      },
+    },
     grn: {
-      name: 'Goods received (GRN)',
+      name: 'GRNs (goods received notes)',
       actions: {
         view: {},
-        check: { label: 'Check delivery' },
+        check: { label: 'Check GRN' },
         post: { label: 'Post GRN' },
         putaway: { label: 'Put away' },
         reverse: { label: 'Reverse posted GRN' },
@@ -42,22 +69,29 @@ export const inventoryManifest = defineModule({
       actions: { view: {}, report: {}, close: {} },
     },
     mrn: {
-      name: 'Material requests (MRN)',
+      name: 'MRNs (material request notes)',
       actions: {
         view: { scopes: ['OWN', 'DEPARTMENT', 'ALL'] },
         create: {},
         check: { label: 'Check and reserve stock' },
-        allocate: { label: 'Assign new stock to waiting requests' },
+        allocate: { label: 'Assign new stock to waiting MRNs' },
         cancel: {},
         short_close: { label: 'Close with short lines' },
       },
     },
     aod: {
-      name: 'Dispatch (AOD)',
+      name: 'AODs (advice of dispatch)',
       actions: {
         view: { scopes: ['OWN', 'DEPARTMENT', 'ALL'] },
-        issue: { label: 'Pick and issue' },
+        issue: { label: 'Pick and issue AOD' },
         attach_signed: { label: 'Attach signed AOD' },
+        approve: {
+          label: 'Approve AODs',
+          description:
+            'Approves or rejects an AOD before Stores issues and prints it. Department: AODs for your own departments.',
+          scopes: ['DEPARTMENT', 'ALL'],
+          approval: true,
+        },
         cancel: {},
       },
     },
@@ -159,6 +193,13 @@ export const inventoryManifest = defineModule({
       icon: 'layers',
     },
     {
+      key: 'inventory.bundles',
+      label: 'Bundles',
+      path: '/inventory/bundles',
+      permission: 'inventory.bundle.view',
+      icon: 'box',
+    },
+    {
       key: 'inventory.receiving',
       label: 'Receiving',
       path: '/inventory/receiving',
@@ -209,13 +250,14 @@ export const inventoryManifest = defineModule({
     },
   ],
   defaultGrants: {
-    stores_manager: { '*': 'ALL' },
+    stores_manager: { '*': 'ALL', 'aod.approve': null },
     stores_keeper: {
       'item.view': 'ALL',
       'item.create': 'ALL',
       'item.edit': 'ALL',
       'item.print_label': 'ALL',
       'catalog.view': 'ALL',
+      'bundle.view': 'ALL',
       'location.view': 'ALL',
       'location.print_label': 'ALL',
       'stock.view': 'ALL',

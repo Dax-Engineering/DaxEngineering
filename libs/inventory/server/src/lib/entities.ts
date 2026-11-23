@@ -64,11 +64,13 @@ export const itemEntity = defineEntity<ItemField>({
       writable: true,
     },
     supersededById: {
-      label: 'Replaced by',
+      label: 'Superseded by',
       tier: 'INTERNAL',
       locked: true,
       writable: true,
     },
+    familyId: { label: 'Part family', tier: 'INTERNAL', locked: true },
+    familyDepth: { label: 'Family position', tier: 'INTERNAL', locked: true },
     status: {
       label: 'Status',
       tier: 'INTERNAL',
@@ -221,7 +223,7 @@ const shown = (label: string) =>
 export const grnEntity = defineEntity<GrnField>({
   key: 'inventory.grn',
   moduleKey: 'inventory',
-  label: 'Goods received notes',
+  label: 'GRNs',
   table: 'inventory.grn',
   fields: {
     id: shown('ID'),
@@ -288,7 +290,7 @@ export const holdEntity = defineEntity<HoldField>({
     departmentId: { ...shown('Department'), filterable: true },
     departmentName: shown('Department name'),
     reason: { ...shown('Reason'), writable: true },
-    convertedMrnId: shown('Request'),
+    convertedMrnId: shown('MRN'),
     releasedBy: shown('Released by'),
     releasedAt: shown('Released'),
     version: shown('Version'),
@@ -302,7 +304,7 @@ export const holdEntity = defineEntity<HoldField>({
 export const mrnEntity = defineEntity<MrnField>({
   key: 'inventory.mrn',
   moduleKey: 'inventory',
-  label: 'Material requests',
+  label: 'MRNs',
   table: 'inventory.mrn',
   fields: {
     id: shown('ID'),
@@ -336,17 +338,24 @@ export const mrnEntity = defineEntity<MrnField>({
 export const aodEntity = defineEntity<AodField>({
   key: 'inventory.aod',
   moduleKey: 'inventory',
-  label: 'Dispatch notes (AOD)',
+  label: 'AODs',
   table: 'inventory.aod',
   fields: {
     id: shown('ID'),
     number: { ...shown('AOD number'), filterable: true, sortable: true },
     type: { ...shown('Type'), writable: true, filterable: true },
     status: { ...shown('Status'), filterable: true },
-    mrnId: shown('Request'),
+    mrnId: shown('MRN'),
     deliverTo: { ...shown('Deliver to'), writable: true },
     vehicleNo: { ...shown('Vehicle'), writable: true },
     notes: { ...shown('Notes'), writable: true },
+    submittedBy: shown('Sent for approval by'),
+    submittedAt: shown('Sent for approval'),
+    approvedBy: shown('Approved by'),
+    approvedAt: shown('Approved'),
+    rejectedBy: shown('Rejected by'),
+    rejectedAt: shown('Rejected'),
+    rejectReason: shown('Reason for rejecting'),
     issuedBy: shown('Issued by'),
     issuedAt: { ...shown('Issued'), sortable: true },
     signedBy: shown('Signed copy added by'),

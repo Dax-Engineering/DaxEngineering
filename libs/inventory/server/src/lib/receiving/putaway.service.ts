@@ -20,6 +20,7 @@ import {
   specialBins,
   toItemRef,
 } from './shared';
+import { moveSerials } from './serials';
 
 @Injectable()
 export class PutawayService {
@@ -179,6 +180,14 @@ export class PutawayService {
         ];
       });
       await this.stock.post(tx, movements, policy.userId);
+      for (const m of moves) {
+        await moveSerials(tx, {
+          grnLineId: m.grnLineId,
+          fromBinId: bins.receiving,
+          toBinId: m.binId,
+          qty: m.qty,
+        });
+      }
 
       const added = new Map<string, Prisma.Decimal>();
       for (const m of moves) {

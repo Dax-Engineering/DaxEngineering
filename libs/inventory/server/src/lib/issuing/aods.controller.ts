@@ -16,6 +16,7 @@ import {
   type AodDto,
   type AodPage,
   AodQuery,
+  AodReject,
   AodSign,
   AodTransition,
   AodUpdate,
@@ -49,9 +50,16 @@ export class AodsController {
   async pdf(
     @Req() req: DaxRequest,
     @Param('id', ParseUUIDPipe) id: string,
+    @Query('copy') copy: unknown,
   ): Promise<StreamableFile> {
-    const { number, pdf } = await this.aods.pdf(sessionOf(req).policy, id);
-    const name = (number ?? 'aod').replace(/[^A-Za-z0-9-]+/g, '-');
+    const which = copy === 'customer' ? 'customer' : 'dax';
+    const { number, pdf } = await this.aods.pdf(
+      sessionOf(req).policy,
+      id,
+      which,
+    );
+    const base = (number ?? 'aod').replace(/[^A-Za-z0-9-]+/g, '-');
+    const name = which === 'customer' ? `${base}-customer` : base;
     return new StreamableFile(pdf, {
       type: 'application/pdf',
       disposition: `inline; filename="${name}.pdf"`,
@@ -73,6 +81,49 @@ export class AodsController {
     @Body() body: unknown,
   ): Promise<AodDto> {
     return this.aods.update(sessionOf(req).policy, id, parse(AodUpdate, body));
+  }
+
+  @Post(':id/submit')
+  @Requires('inventory.aod.issue')
+  submit(
+    @Req() req: DaxRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ): Promise<AodDto> {
+    const { version } = parse(AodTransition, body);
+    return this.aods.submit(sessionOf(req).policy, id, version);
+  }
+
+  @Post(':id/withdraw')
+  @Requires('inventory.aod.issue')
+  withdraw(
+    @Req() req: DaxRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ): Promise<AodDto> {
+    const { version } = parse(AodTransition, body);
+    return this.aods.withdraw(sessionOf(req).policy, id, version);
+  }
+
+  @Post(':id/approve')
+  @Requires('inventory.aod.approve')
+  approve(
+    @Req() req: DaxRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ): Promise<AodDto> {
+    const { version } = parse(AodTransition, body);
+    return this.aods.approve(sessionOf(req).policy, id, version);
+  }
+
+  @Post(':id/reject')
+  @Requires('inventory.aod.approve')
+  reject(
+    @Req() req: DaxRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ): Promise<AodDto> {
+    return this.aods.reject(sessionOf(req).policy, id, parse(AodReject, body));
   }
 
   @Post(':id/issue')

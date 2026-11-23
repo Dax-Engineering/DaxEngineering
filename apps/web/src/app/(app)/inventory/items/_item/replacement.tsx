@@ -27,7 +27,7 @@ export function Replacement({
       {item.supersededBy ? (
         <Group justify="space-between" wrap="wrap">
           <Text size="sm">
-            Replaced by{' '}
+            Superseded by{' '}
             <AppLink href={`/inventory/items/${item.supersededBy.id}`} fw={600}>
               <span className="dax-mono">{item.supersededBy.partNo}</span> (
               {item.supersededBy.brand})
@@ -40,18 +40,20 @@ export function Replacement({
               loading={pending}
               onClick={() => save(null)}
             >
-              Remove replacement
+              Remove
             </Button>
           ) : null}
         </Group>
       ) : (
         <Text size="sm" c="dimmed">
-          This part has not been replaced.
+          {item.supersedes.length
+            ? 'This is the current part number of its family. Nothing newer has superseded it yet.'
+            : 'Nothing has superseded this part number. It is the current one.'}
         </Text>
       )}
       {item.supersedes.length ? (
         <Text size="sm">
-          Replaces:{' '}
+          It supersedes:{' '}
           {item.supersedes.map((old, i) => (
             <span key={old.id}>
               {i > 0 ? ', ' : ''}
@@ -65,7 +67,9 @@ export function Replacement({
       {canEdit ? (
         <Group align="flex-end" gap="sm" wrap="wrap">
           <ItemPicker
-            label={item.supersededBy ? 'Change replacement' : 'Replaced by'}
+            label={
+              item.supersededBy ? 'Change superseding number' : 'Superseded by'
+            }
             excludeId={item.id}
             initial={null}
             value={choice}
@@ -79,7 +83,7 @@ export function Replacement({
             loading={pending}
             size="md"
           >
-            Save replacement
+            Save
           </Button>
         </Group>
       ) : null}

@@ -3,6 +3,7 @@ import type { MrnDto } from '@dax/inventory-contract';
 import type {
   AttachmentAccessRegistry,
   EventBus,
+  InboxService,
   NumberingService,
   Policy,
 } from '@dax/platform-core';
@@ -68,14 +69,38 @@ const holdRow = {
   _count: { lines: 1 },
 };
 
-const engine = (overrides: Partial<Record<string, unknown>> = {}) =>
-  ({
+type FakeEngine = {
+  lockFreeQty: (tx: unknown, itemId: string) => Promise<Prisma.Decimal>;
+  reserve: (
+    tx: unknown,
+    r: { itemId: string; qty: Prisma.Decimal },
+  ) => Promise<void>;
+};
+
+// Families of one number: the family helpers defer to the single-item fakes.
+const engine = (overrides: Partial<Record<string, unknown>> = {}) => {
+  const base = {
     lockFreeQty: async () => new Prisma.Decimal(10),
     reserve: async () => undefined,
     release: async () => new Prisma.Decimal(0),
     transfer: async () => undefined,
     ...overrides,
-  }) as unknown as StockPostingService;
+  } as Record<string, unknown> & FakeEngine;
+  return {
+    ...base,
+    lockFamilyFree: async (tx: unknown, familyId: string) => [
+      { itemId: familyId, free: await base.lockFreeQty(tx, familyId) },
+    ],
+    reserveFromFamily: async (
+      tx: unknown,
+      r: { familyId: string; qty: Prisma.Decimal | string },
+    ) => {
+      const qty = new Prisma.Decimal(r.qty);
+      await base.reserve(tx, { ...r, itemId: r.familyId, qty });
+      return [{ itemId: r.familyId, qty }];
+    },
+  } as unknown as StockPostingService;
+};
 
 const numbering = {
   next: async () => ({ number: 'X/26/0001' }),
@@ -88,6 +113,7 @@ describe('holds', () => {
   ) {
     const tx = {
       hold: { create: async () => ({ id: ID, lines: [] }) },
+      item: { findMany: async () => [{ id: ITEM, familyId: ITEM }] },
     };
     const prisma = asPrisma({
       hold: { findMany, count: async () => 1 },
@@ -195,7 +221,7 @@ describe('request checking', () => {
             qtyRequested: new Prisma.Decimal(4),
             qtyIssued: new Prisma.Decimal(0),
             qtyShortClosed: new Prisma.Decimal(0),
-            item: { partNo: 'P-1' },
+            item: { partNo: 'P-1', familyId: ITEM },
           },
         ],
       },
@@ -284,6 +310,7 @@ describe('AOD creation', () => {
       fakeStore,
       {} as MrnsService,
       { register: () => undefined } as unknown as AttachmentAccessRegistry,
+      {} as InboxService,
     );
     const error = await failure(
       service.create(fakePolicy(['inventory.aod.issue']), {

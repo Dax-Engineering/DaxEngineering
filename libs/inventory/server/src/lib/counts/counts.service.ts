@@ -749,8 +749,8 @@ export class CountsService {
         conflict(
           'INSUFFICIENT_STOCK',
           line
-            ? `The count shows less of ${line.item.partNo} in ${line.bin.code} than is reserved or quarantined. Release holds or requests first.`
-            : 'The count shows less of a part than is reserved or quarantined. Release holds or requests first.',
+            ? `The count shows less of ${line.item.partNo} in ${line.bin.code} than is reserved or quarantined. Release holds or MRNs first.`
+            : 'The count shows less of a part than is reserved or quarantined. Release holds or MRNs first.',
         );
       }
       throw error;

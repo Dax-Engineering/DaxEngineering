@@ -429,6 +429,20 @@ describe('registry', () => {
     ]);
   });
 
+  it('keeps a withheld action out of a wildcard grant', () => {
+    const manifest = {
+      ...coreManifest,
+      defaultGrants: {
+        stores_manager: { '*': 'ALL' as const, 'audit.view': null },
+      },
+    };
+    const grants = defaultGrantsFor(
+      manifest,
+      new Set(['core.audit.view', 'core.audit.export']),
+    );
+    expect(grants.map((g) => g.permissionKey)).toEqual(['core.audit.export']);
+  });
+
   it('hashes the catalog deterministically', () => {
     const a = catalogHash({ modules: [coreManifest], entities: [entity] });
     expect(a).toBe(
