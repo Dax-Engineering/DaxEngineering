@@ -13,7 +13,6 @@ export default async function NewBinsPage() {
     <>
       <PageHead
         back={{ href: '/inventory/locations', label: 'Bins and zones' }}
-        eyebrow="Inventory"
         title="Add bins"
         lede="Bin codes read Zone-Rack-Shelf-Position. Rack and shelf numbers get a leading zero, so rack 1 shelf 2 position B in zone A is A-01-02-B."
       />

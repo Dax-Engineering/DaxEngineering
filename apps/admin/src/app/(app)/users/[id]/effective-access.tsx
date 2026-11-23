@@ -1,7 +1,6 @@
 import {
   Alert,
   Stack,
-  Table,
   TableScrollContainer,
   TableTbody,
   TableTd,
@@ -10,7 +9,7 @@ import {
   TableTr,
 } from '@mantine/core';
 import type { AdminCatalog, EffectiveAccess } from '@dax/platform-contract';
-import { Empty, Pill, SectionCard } from '@dax/web-shell';
+import { Empty, Pill, SectionCard, ScrollTable } from '@dax/web-shell';
 import type { PermissionInfo } from '../../../../lib/catalog';
 import { SCOPE_LABELS } from '../../../../lib/format';
 
@@ -74,7 +73,7 @@ export function EffectiveAccessView({
           </div>
         ) : (
           <TableScrollContainer minWidth={560}>
-            <Table>
+            <ScrollTable>
               <TableThead>
                 <TableTr>
                   <TableTh>Permission</TableTh>
@@ -103,7 +102,7 @@ export function EffectiveAccessView({
                   </TableTr>
                 ))}
               </TableTbody>
-            </Table>
+            </ScrollTable>
           </TableScrollContainer>
         )}
         {access.denied.length ? (

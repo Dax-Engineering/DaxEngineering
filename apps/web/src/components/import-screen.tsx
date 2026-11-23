@@ -12,7 +12,7 @@ import {
   Text,
 } from '@mantine/core';
 import { startTransition, useActionState, useState } from 'react';
-import { Mono, Pill, SectionCard } from '@dax/web-shell';
+import { Mono, Pill, SectionCard, ScrollTable } from '@dax/web-shell';
 import type { ImportKind, ImportState } from '../lib/import';
 import { runImport } from '../lib/import-actions';
 import { AppLink } from './links';
@@ -125,7 +125,7 @@ export function ImportScreen({
                   check it again.
                 </Alert>
                 <Table.ScrollContainer minWidth={420}>
-                  <Table>
+                  <ScrollTable>
                     <Table.Thead>
                       <Table.Tr>
                         <Table.Th>Row</Table.Th>
@@ -144,7 +144,7 @@ export function ImportScreen({
                         </Table.Tr>
                       ))}
                     </Table.Tbody>
-                  </Table>
+                  </ScrollTable>
                 </Table.ScrollContainer>
               </>
             ) : null}

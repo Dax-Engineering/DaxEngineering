@@ -23,12 +23,11 @@ export default async function ChooseScanPage() {
     'inventory.item.view',
     'inventory.location.view',
   );
-  const canPhone = canDo(caps, 'inventory.item.view');
+  const canPhone = canDo(caps, 'inventory.phone_scan.use');
   return (
     <>
       <PageHead
         back={{ href: '/', label: 'Home' }}
-        eyebrow="Scan a label"
         title="How do you want to scan?"
         lede="Your choice opens in a new tab, so this page stays here."
       />

@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Group, SimpleGrid, Stack, TextInput } from '@mantine/core';
+import { DayInput } from '@dax/web-shell';
 import { useActionState, useState } from 'react';
 import { StateAlert } from '../../../../../../components/state-alert';
 import { fieldError, IDLE } from '../../../../../../lib/action-state';
@@ -37,9 +38,8 @@ export function WalkInForm() {
             error={err('deliveryNote')}
             size="lg"
           />
-          <TextInput
+          <DayInput
             name="deliveryDate"
-            type="date"
             label="Date on the delivery note"
             description="For information. Stock is received today."
             error={err('deliveryDate')}

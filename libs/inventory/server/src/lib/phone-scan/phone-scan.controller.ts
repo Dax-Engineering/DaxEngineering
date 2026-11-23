@@ -49,14 +49,14 @@ export class PhoneScanController {
   // PC side: the signed-in user who lends their access to a phone.
 
   @Post()
-  @Requires('inventory.item.view')
+  @Requires('inventory.phone_scan.use')
   @Header('Cache-Control', 'no-store')
   start(@Req() req: DaxRequest): Promise<PhoneScanStart> {
     return this.phone.start(sessionOf(req).policy);
   }
 
   @Get(':id')
-  @Requires('inventory.item.view')
+  @Requires('inventory.phone_scan.use')
   @Header('Cache-Control', 'no-store')
   view(
     @Req() req: DaxRequest,
@@ -66,7 +66,7 @@ export class PhoneScanController {
   }
 
   @Post(':id/extend')
-  @Requires('inventory.item.view')
+  @Requires('inventory.phone_scan.use')
   @HttpCode(200)
   extend(
     @Req() req: DaxRequest,
@@ -76,7 +76,7 @@ export class PhoneScanController {
   }
 
   @Post(':id/end')
-  @Requires('inventory.item.view')
+  @Requires('inventory.phone_scan.use')
   @HttpCode(200)
   end(
     @Req() req: DaxRequest,
@@ -86,7 +86,7 @@ export class PhoneScanController {
   }
 
   @Patch(':id/lines/:lineId')
-  @Requires('inventory.item.view')
+  @Requires('inventory.phone_scan.use')
   setQty(
     @Req() req: DaxRequest,
     @Param('id', ParseUUIDPipe) id: string,
@@ -98,7 +98,7 @@ export class PhoneScanController {
   }
 
   @Delete(':id/lines/:lineId')
-  @Requires('inventory.item.view')
+  @Requires('inventory.phone_scan.use')
   removeLine(
     @Req() req: DaxRequest,
     @Param('id', ParseUUIDPipe) id: string,
@@ -108,7 +108,7 @@ export class PhoneScanController {
   }
 
   @Post(':id/scan')
-  @Requires('inventory.item.view')
+  @Requires('inventory.phone_scan.use')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   scanFromPc(
@@ -124,7 +124,7 @@ export class PhoneScanController {
   }
 
   @Get(':id/lines/:lineId/suggest')
-  @Requires('inventory.item.view')
+  @Requires('inventory.phone_scan.use')
   @Header('Cache-Control', 'no-store')
   suggest(
     @Req() req: DaxRequest,
@@ -135,7 +135,7 @@ export class PhoneScanController {
   }
 
   @Post(':id/lines/:lineId/link')
-  @Requires('inventory.item.view')
+  @Requires('inventory.phone_scan.use')
   @HttpCode(200)
   link(
     @Req() req: DaxRequest,

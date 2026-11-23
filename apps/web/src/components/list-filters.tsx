@@ -37,6 +37,7 @@ export function ListFilters({
   const params = useSearchParams();
   const [q, setQ] = useState(params.get('q') ?? '');
   const [pending, startTransition] = useTransition();
+  const [moreOpen, setMoreOpen] = useState(false);
 
   function go(changes: Record<string, string | null>) {
     const next = new URLSearchParams(params.toString());
@@ -60,6 +61,11 @@ export function ListFilters({
   const chipSets = selects.filter((s) => s.chips);
   const current = (s: FilterSelect) =>
     params.get(s.name) ?? s.defaultValue ?? '';
+  // Phones fold two or more dropdowns behind a Filters button.
+  const foldable = dropdowns.length > 1;
+  const activeCount = dropdowns.filter(
+    (s) => params.get(s.name) && params.get(s.name) !== s.defaultValue,
+  ).length;
 
   return (
     <form
@@ -79,29 +85,54 @@ export function ListFilters({
           radius="xl"
           leftSection={<Icon name="search" size={18} />}
           rightSection={pending ? <Loader size={16} /> : null}
-          style={{ flex: '1 1 240px', maxWidth: 460 }}
+          className="dax-filter-q"
         />
-        <Button type="submit" variant="default" loading={pending}>
+        <Button
+          type="submit"
+          variant="default"
+          loading={pending}
+          className="dax-filter-go"
+        >
           Search
         </Button>
-        {dropdowns.map((s) => (
-          <Select
-            key={s.name}
-            aria-label={s.label}
-            data={s.data}
-            placeholder={s.placeholder ?? `${s.label}: all`}
-            value={params.get(s.name) ?? s.defaultValue ?? null}
-            onChange={(value) =>
-              go({ [s.name]: value === s.defaultValue ? null : value })
-            }
-            clearable={s.defaultValue === undefined}
-            searchable={s.data.length > 8}
-            allowDeselect={false}
-            radius="xl"
-            comboboxProps={{ withinPortal: true }}
-            style={{ flex: '1 1 180px', maxWidth: 260 }}
-          />
-        ))}
+        {foldable ? (
+          <Button
+            type="button"
+            variant={activeCount ? 'light' : 'default'}
+            className="dax-filter-toggle"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen((o) => !o)}
+            leftSection={<Icon name="filter" size={18} />}
+          >
+            {activeCount ? `Filters (${activeCount})` : 'Filters'}
+          </Button>
+        ) : null}
+        <div
+          className={[
+            'dax-filter-more',
+            foldable ? 'foldable' : '',
+            moreOpen ? 'open' : '',
+          ].join(' ')}
+        >
+          {dropdowns.map((s) => (
+            <Select
+              key={s.name}
+              aria-label={s.label}
+              data={s.data}
+              placeholder={s.placeholder ?? `${s.label}: all`}
+              value={params.get(s.name) ?? s.defaultValue ?? null}
+              onChange={(value) =>
+                go({ [s.name]: value === s.defaultValue ? null : value })
+              }
+              clearable={s.defaultValue === undefined}
+              searchable={s.data.length > 8}
+              allowDeselect={false}
+              radius="xl"
+              comboboxProps={{ withinPortal: true }}
+              className="dax-filter-select"
+            />
+          ))}
+        </div>
       </div>
       {chipSets.length || toggles.length ? (
         <div className="dax-chip-groups">

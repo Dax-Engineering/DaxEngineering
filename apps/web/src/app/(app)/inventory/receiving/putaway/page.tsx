@@ -36,7 +36,6 @@ export default async function PutawayPage({
     <>
       <PageHead
         back={{ href: BASE, label: 'Receiving' }}
-        eyebrow="Receiving"
         title="Put away"
         lede="Received stock waits in the receiving bin. Move it to a shelf to make it free."
         actions={
@@ -50,6 +49,7 @@ export default async function PutawayPage({
       <PutawayBoard
         groups={[...groups.values()]}
         canAct={canDo(caps, 'inventory.grn.putaway')}
+        canPrintSerials={canDo(caps, 'inventory.serial.print_label')}
       />
     </>
   );

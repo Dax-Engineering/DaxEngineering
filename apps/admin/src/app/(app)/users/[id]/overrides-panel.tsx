@@ -8,7 +8,6 @@ import {
   Stack,
   Table,
   Textarea,
-  TextInput,
 } from '@mantine/core';
 import {
   startTransition,
@@ -19,7 +18,13 @@ import {
   useState,
 } from 'react';
 import type { OverrideDto } from '@dax/platform-contract';
-import { Empty, Pill, SectionCard } from '@dax/web-shell';
+import {
+  Empty,
+  Pill,
+  SectionCard,
+  DayInput,
+  ScrollTable,
+} from '@dax/web-shell';
 import { StateAlert } from '../../../../components/state-alert';
 import {
   type ActionState,
@@ -87,7 +92,7 @@ function OverrideList({
         </div>
       ) : null}
       <Table.ScrollContainer minWidth={680}>
-        <Table>
+        <ScrollTable>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Effect</Table.Th>
@@ -132,7 +137,7 @@ function OverrideList({
               </Table.Tr>
             ))}
           </Table.Tbody>
-        </Table>
+        </ScrollTable>
       </Table.ScrollContainer>
     </SectionCard>
   );
@@ -244,8 +249,7 @@ function AddOverrideForm({
             error={err('reason')}
           />
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            <TextInput
-              type="date"
+            <DayInput
               name="expiresOn"
               label="Expires on"
               description="Leave empty for no expiry."

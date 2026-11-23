@@ -51,8 +51,9 @@ const NO_STOCK = { onHand: '0', free: '0', bins: 0 };
 
 /** What a scanned code is, from its content alone. */
 export function codeKind(code: string): CodeKind {
-  if (parseScanCode(code).kind === 'qr') return 'dax';
   if (extractGtin(code)) return /^\d+$/.test(code.trim()) ? 'product' : 'box';
+  const parsed = parseScanCode(code);
+  if (parsed.kind === 'text' && parsed.maybeToken) return 'dax';
   return partNumberFrom(code) ? 'part' : 'text';
 }
 

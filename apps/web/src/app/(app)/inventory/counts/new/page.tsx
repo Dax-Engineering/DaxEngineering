@@ -12,7 +12,6 @@ export default async function NewCountPage() {
     <>
       <PageHead
         back={{ href: BASE, label: 'Stock counts' }}
-        eyebrow="Stock counts"
         title="New count"
         lede="Counting starts as soon as you create the count. The chosen bins are frozen: nothing can be put away into them or issued from them until the count is posted or cancelled."
       />

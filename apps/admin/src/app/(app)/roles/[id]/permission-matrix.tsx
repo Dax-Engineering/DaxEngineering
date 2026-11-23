@@ -9,7 +9,7 @@ import {
   Text,
   Tooltip,
 } from '@mantine/core';
-import { Pill, SectionCard } from '@dax/web-shell';
+import { Pill, SectionCard, ScrollTable } from '@dax/web-shell';
 import type { Dispatch, SetStateAction } from 'react';
 import type { CatalogAction, CatalogModule } from '../../../../lib/catalog';
 import { SCOPE_LABELS } from '../../../../lib/format';
@@ -155,7 +155,7 @@ export function PermissionMatrix({
             actions={module.enabled ? undefined : <Pill>Off</Pill>}
           >
             <Table.ScrollContainer minWidth={180 + columns.length * 150}>
-              <Table verticalSpacing="xs">
+              <ScrollTable verticalSpacing="xs">
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Feature</Table.Th>
@@ -195,7 +195,7 @@ export function PermissionMatrix({
                     </Table.Tr>
                   ))}
                 </Table.Tbody>
-              </Table>
+              </ScrollTable>
             </Table.ScrollContainer>
           </SectionCard>
         );

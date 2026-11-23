@@ -16,6 +16,30 @@ export const inventoryManifest = defineModule({
         archive: {},
         print_label: { label: 'Print labels' },
         import: { label: 'Import from CSV' },
+        supersede: {
+          label: 'Change supersession',
+          description:
+            'Marks a part number as superseded by another, which changes which stock MRNs reserve first.',
+        },
+      },
+    },
+    serial: {
+      name: 'Serial numbers',
+      actions: {
+        print_label: {
+          label: 'Print serial labels',
+          description: 'Prints and reprints the Code 128 label of each unit.',
+        },
+      },
+    },
+    phone_scan: {
+      name: 'Scan with External Phone',
+      actions: {
+        use: {
+          label: 'Lend a phone as a scanner',
+          description:
+            'Pairs a phone with this PC so its camera scans into a list here.',
+        },
       },
     },
     catalog: {
@@ -34,12 +58,12 @@ export const inventoryManifest = defineModule({
     },
     stock: { name: 'Stock levels', actions: { view: {}, export: {} } },
     stock_age: {
-      name: 'Stock age',
+      name: 'Age analysis',
       actions: {
         settings: {
           label: 'Change age bands',
           description:
-            'Sets the day limits of the bands in the Stock age report.',
+            'Sets the day limits of the bands in the Age analysis report.',
         },
       },
     },
@@ -85,6 +109,10 @@ export const inventoryManifest = defineModule({
         view: { scopes: ['OWN', 'DEPARTMENT', 'ALL'] },
         issue: { label: 'Pick and issue AOD' },
         attach_signed: { label: 'Attach signed AOD' },
+        print: {
+          label: 'Print AODs',
+          description: 'Prints and reprints the DAX and customer copies.',
+        },
         approve: {
           label: 'Approve AODs',
           description:
@@ -256,6 +284,8 @@ export const inventoryManifest = defineModule({
       'item.create': 'ALL',
       'item.edit': 'ALL',
       'item.print_label': 'ALL',
+      'serial.print_label': 'ALL',
+      'phone_scan.use': 'ALL',
       'catalog.view': 'ALL',
       'bundle.view': 'ALL',
       'location.view': 'ALL',
@@ -273,6 +303,7 @@ export const inventoryManifest = defineModule({
       'aod.view': 'ALL',
       'aod.issue': 'ALL',
       'aod.attach_signed': 'ALL',
+      'aod.print': 'ALL',
       'hold.view': 'ALL',
       'hold.create': 'ALL',
       'hold.release': 'ALL',

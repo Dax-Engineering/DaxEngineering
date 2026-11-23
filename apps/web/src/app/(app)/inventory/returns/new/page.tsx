@@ -106,7 +106,6 @@ export default async function NewReturnPage({
     <>
       <PageHead
         back={{ href: BASE, label: 'Returns' }}
-        eyebrow="Returns"
         title="New return"
         lede="Return parts against the AOD they left on, or as a free return with a reason."
       />

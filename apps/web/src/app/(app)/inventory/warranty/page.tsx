@@ -1,7 +1,6 @@
 import {
   Alert,
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -18,6 +17,7 @@ import {
   PageHead,
   Pager,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { LinkButton } from '../../../../components/links';
 import { ListFilters } from '../../../../components/list-filters';
@@ -110,7 +110,7 @@ export default async function WarrantyListPage({
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>Tag</TableTh>
@@ -161,7 +161,7 @@ export default async function WarrantyListPage({
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {page.items.map((t) => (

@@ -137,6 +137,19 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M4.5 10H15a4.5 4.5 0 0 1 0 9h-3" />
     </>
   ),
+  refresh: (
+    <>
+      <path d="M20 12a8 8 0 1 1-8-8c2.2 0 4.3.9 5.9 2.4L20 8.5" />
+      <path d="M20 4v4.5h-4.5" />
+    </>
+  ),
+  filter: (
+    <>
+      <path d="M4 6h16" />
+      <path d="M7 12h10" />
+      <path d="M10 18h4" />
+    </>
+  ),
   clipboard: (
     <>
       <rect x="5" y="4.5" width="14" height="16" rx="2.5" />

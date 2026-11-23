@@ -11,7 +11,6 @@ export default async function NewHoldPage() {
     <>
       <PageHead
         back={{ href: `${BASE}/holds`, label: 'Holds' }}
-        eyebrow="Issuing"
         title="New hold"
         lede="Keep free stock aside for a customer or job. A hold stays until it is released or turned into an MRN."
       />

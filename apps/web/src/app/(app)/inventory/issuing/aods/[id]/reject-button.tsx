@@ -26,7 +26,7 @@ export function RejectButton({ id, version }: { id: string; version: number }) {
   );
   return (
     <>
-      <Button variant="default" color="red" onClick={() => setOpened(true)}>
+      <Button variant="light" color="red" onClick={() => setOpened(true)}>
         Reject
       </Button>
       <Modal

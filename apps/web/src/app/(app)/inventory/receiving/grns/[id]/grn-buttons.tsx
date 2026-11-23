@@ -178,7 +178,7 @@ export function ReverseGrnButton({
   const short = reason.trim().length < 5;
   return (
     <>
-      <Button variant="default" color="red" onClick={() => setOpened(true)}>
+      <Button variant="light" color="red" onClick={() => setOpened(true)}>
         Reverse
       </Button>
       <Modal

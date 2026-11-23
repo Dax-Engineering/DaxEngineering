@@ -43,7 +43,7 @@ export function ReleaseHoldButton({
   const { opened, setOpened, state, run, pending } = useDialog(releaseHold);
   return (
     <>
-      <Button variant="default" color="red" onClick={() => setOpened(true)}>
+      <Button variant="light" color="red" onClick={() => setOpened(true)}>
         Release
       </Button>
       <Modal

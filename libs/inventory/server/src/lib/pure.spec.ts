@@ -153,27 +153,14 @@ describe('supersession', () => {
 });
 
 describe('scan codes', () => {
-  it('reads item and bin QR URLs on any host', () => {
+  it('no longer reads old QR label links', () => {
     expect(
       parseScanCode('https://stores.example.com/q/i/AbC123xyZ789'),
     ).toEqual({
-      kind: 'qr',
-      type: 'item',
-      token: 'AbC123xyZ789',
+      kind: 'text',
+      value: 'https://stores.example.com/q/i/AbC123xyZ789',
+      maybeToken: false,
     });
-    expect(parseScanCode('http://localhost:3000/q/b/AbC123xyZ789/')).toEqual({
-      kind: 'qr',
-      type: 'bin',
-      token: 'AbC123xyZ789',
-    });
-    expect(parseScanCode('/q/i/AbC123xyZ789').kind).toBe('qr');
-  });
-
-  it('ignores unrelated URLs and bad tokens', () => {
-    expect(parseScanCode('https://example.com/q/z/AbC123xyZ789').kind).toBe(
-      'empty',
-    );
-    expect(parseScanCode('https://example.com/q/i/short').kind).toBe('empty');
     expect(parseScanCode('   ').kind).toBe('empty');
   });
 

@@ -137,6 +137,8 @@ export interface ActionTileItem {
   sub?: string;
   icon: string;
   use: TileUse;
+  /** Items waiting on this task, shown as a badge. */
+  count?: number;
 }
 
 const USE_STYLE: Record<TileUse, { rank: number; tint: string }> = {
@@ -161,6 +163,11 @@ export function ActionTiles({ items }: { items: ActionTileItem[] }) {
           <span className="badge">
             <Icon name={t.icon} size={20} />
           </span>
+          {t.count !== undefined ? (
+            <span className={t.count ? 'count' : 'count zero'}>
+              {t.count.toLocaleString('en-LK')}
+            </span>
+          ) : null}
           <b>{t.title}</b>
           {t.sub ? <span className="sub">{t.sub}</span> : null}
         </Link>
@@ -198,6 +205,30 @@ export function Chips({
         </Link>
       ))}
     </div>
+  );
+}
+
+/** Tabs within one page, as links so each tab is its own URL. */
+export function PageTabs({
+  label,
+  items,
+}: {
+  label: string;
+  items: { href: string; label: ReactNode; active: boolean }[];
+}) {
+  return (
+    <nav className="dax-pagetabs" aria-label={label}>
+      {items.map((t) => (
+        <Link
+          key={t.href}
+          href={t.href}
+          scroll={false}
+          aria-current={t.active ? 'page' : undefined}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
   );
 }
 

@@ -1,4 +1,5 @@
-import { CapabilityProvider, DaxShell } from '@dax/web-shell';
+import { cookies } from 'next/headers';
+import { CapabilityProvider, DaxShell, RAIL_COOKIE } from '@dax/web-shell';
 import { requireCapabilities, requireReadyUser } from '../../lib/server';
 
 const FALLBACK_ICONS: Record<string, string> = {
@@ -29,6 +30,7 @@ export default async function AppLayout({
   return (
     <CapabilityProvider value={caps}>
       <DaxShell
+        railOpen={(await cookies()).get(RAIL_COOKIE)?.value === 'open'}
         appLabel="Admin"
         userName={me.user.name}
         userNote={me.user.isSuperAdmin ? 'Super admin' : 'Admin'}

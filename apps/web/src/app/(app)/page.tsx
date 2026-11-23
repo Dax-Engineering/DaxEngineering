@@ -116,41 +116,37 @@ export default async function HomePage({
     tiles.push({
       href: '/inventory/issuing/aods?status=PENDING_APPROVAL',
       title: 'Approve AODs',
-      sub: issuing
-        ? `${count.format(issuing.awaitingApproval)} waiting for your approval before Stores issues them.`
-        : 'Approve or reject AODs before Stores issues and prints them.',
+      sub: 'Waiting for your approval before Stores issues them.',
       icon: 'check',
       use: 'often',
+      count: issuing?.awaitingApproval,
     });
   if (canSign)
     tiles.push({
       href: '/inventory/issuing/aods?status=ISSUED',
       title: 'Awaiting signature',
-      sub: issuing
-        ? `${count.format(issuing.awaitingSignature)} AODs need their signed copy.`
-        : 'Upload signed copies to complete AODs.',
+      sub: 'Issued AODs that need their signed copy uploaded.',
       icon: 'send',
       use: 'often',
+      count: issuing?.awaitingSignature,
     });
   if (canAllocate)
     tiles.push({
       href: '/inventory/issuing/mrns?status=WAITING',
       title: 'Waiting for stock',
-      sub: issuing
-        ? `${count.format(issuing.mrnWaiting)} MRNs waiting for stock.`
-        : 'Assign new stock to waiting MRNs.',
+      sub: 'Assign newly arrived stock to waiting MRNs.',
       icon: 'history',
       use: 'often',
+      count: issuing?.mrnWaiting,
     });
   if (canPutAway)
     tiles.push({
       href: '/inventory/receiving/putaway',
       title: 'Waiting for put-away',
-      sub: receiving
-        ? `${count.format(receiving.awaitingPutaway)} waiting in the receiving bin.`
-        : 'Move received stock to its shelf.',
+      sub: 'Move received stock from the receiving bin to its shelf.',
       icon: 'box',
       use: 'often',
+      count: receiving?.awaitingPutaway,
     });
   if (can('inventory.grn.check'))
     tiles.push({
@@ -196,21 +192,21 @@ export default async function HomePage({
     tiles.push({
       href: '/inventory/reports/below-minimum',
       title: 'See what to reorder',
-      sub: inventory
-        ? `${count.format(inventory.belowMin)} parts below their minimum.`
-        : 'Parts below their minimum quantity.',
+      sub: 'Parts below their minimum quantity.',
       icon: 'chart',
       use: 'sometimes',
+      count: inventory?.belowMin,
     });
   if (canSeeStock)
     tiles.push({
       href: '/inventory/reports/stock-age',
-      title: 'Stock age',
+      title: 'Age analysis',
       sub: inventory
-        ? `${count.format(inventory.agedOver)} parts held over ${count.format(inventory.agedLimit)} days.`
+        ? `Parts held over ${count.format(inventory.agedLimit)} days.`
         : 'How long parts have been on the shelf.',
       icon: 'history',
       use: 'sometimes',
+      count: inventory?.agedOver,
     });
   if (canSeeItems)
     tiles.push({
@@ -298,7 +294,25 @@ export default async function HomePage({
       />
       {kpis.length ? <KpiTiles items={kpis} /> : null}
       {tiles.length ? (
-        <SectionCard title="What would you like to do?">
+        <SectionCard
+          title="What would you like to do?"
+          note={
+            <span className="dax-tile-key">
+              <span>
+                <i className="orange" />
+                Daily work
+              </span>
+              <span>
+                <i className="blue" />
+                Now and then
+              </span>
+              <span>
+                <i className="gray" />
+                Setup
+              </span>
+            </span>
+          }
+        >
           <ActionTiles items={tiles} />
         </SectionCard>
       ) : (

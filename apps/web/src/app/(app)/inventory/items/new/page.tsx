@@ -12,7 +12,6 @@ export default async function NewItemPage() {
     <>
       <PageHead
         back={{ href: '/inventory/items', label: 'Items' }}
-        eyebrow="Inventory"
         title="New item"
         lede="Part number, brand, unit and minimum stock. Add barcodes after saving."
       />

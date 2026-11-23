@@ -23,15 +23,22 @@ export function trimQty(value: string): string {
   return value.includes('.') ? value.replace(/\.?0+$/, '') : value;
 }
 
-const dateTime = new Intl.DateTimeFormat('en-LK', {
+const dateTime = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Colombo',
-  dateStyle: 'medium',
-  timeStyle: 'short',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
 });
 
+/** 23/11/2026, 11:53 AM in Colombo time. */
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : dateTime.format(d);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : dateTime.format(d).replace(/\b(am|pm)\b/, (m) => m.toUpperCase());
 }
 
 export type BinKind = (typeof BIN_KINDS)[number];
@@ -57,9 +64,11 @@ export function uomLabel(code: string): string {
   return UOMS.find((u) => u.code === code)?.label ?? code;
 }
 
-const day = new Intl.DateTimeFormat('en-LK', {
+const day = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC',
-  dateStyle: 'medium',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
 });
 
 export function formatDay(value: string | null): string {

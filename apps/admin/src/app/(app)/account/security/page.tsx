@@ -13,7 +13,6 @@ export default async function SecurityPage() {
   return (
     <>
       <PageHead
-        eyebrow="Account"
         title="My security"
         lede="Your password and two-step sign-in."
         back={{ href: '/', label: 'Home' }}

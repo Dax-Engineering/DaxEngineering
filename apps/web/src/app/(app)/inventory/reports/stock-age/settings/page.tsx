@@ -13,10 +13,9 @@ export default async function StockAgeSettingsPage() {
   return (
     <>
       <PageHead
-        eyebrow="Reports"
-        title="Stock age bands"
-        back={{ href: `${BASE}/stock-age`, label: 'Stock age' }}
-        lede="Set where each age band ends, in days. Anything older than the last limit goes in the oldest band, which the Stock age tile on Home counts."
+        title="Age analysis bands"
+        back={{ href: `${BASE}/stock-age`, label: 'Age analysis' }}
+        lede="Set where each age band ends, in days. Anything older than the last limit goes in the oldest band, which the Age analysis tile on Home counts."
       />
       <SectionCard title="Bands">
         <CardBody>

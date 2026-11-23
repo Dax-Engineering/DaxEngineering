@@ -94,7 +94,6 @@ describe.skipIf(!url)(
         {
           web: 'https://stores.test',
           admin: 'https://admin.test',
-          labels: 'https://stores.test',
         },
       );
 

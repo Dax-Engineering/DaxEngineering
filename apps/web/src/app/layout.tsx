@@ -1,4 +1,5 @@
 import '@mantine/core/styles.css';
+import '@mantine/dates/styles.css';
 import '@dax/web-shell/styles.css';
 import './global.css';
 import { mantineHtmlProps } from '@mantine/core';

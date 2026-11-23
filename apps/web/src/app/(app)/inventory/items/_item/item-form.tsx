@@ -13,6 +13,7 @@ import {
 } from '@mantine/core';
 import { useActionState, useState } from 'react';
 import type { CatalogLists, ItemDetail } from '@dax/inventory-contract';
+import { LinkButton } from '../../../../../components/links';
 import { StateAlert } from '../../../../../components/state-alert';
 import { fieldError, IDLE } from '../../../../../lib/action-state';
 import { trimQty, UOM_OPTIONS } from '../../../../../lib/format';
@@ -23,9 +24,12 @@ import { saveItem } from './actions';
 export function ItemForm({
   catalog,
   item,
+  cancelHref,
 }: {
   catalog: CatalogLists;
   item?: ItemDetail;
+  /** Shows a Cancel button that leaves the form without saving. */
+  cancelHref?: string;
 }) {
   const [state, action, pending] = useActionState(saveItem, IDLE);
   const [binId, setBinId] = useState<string | null>(
@@ -203,6 +207,11 @@ export function ItemForm({
           <Button type="submit" loading={pending} size="md">
             {item ? 'Save changes' : 'Add item'}
           </Button>
+          {cancelHref ? (
+            <LinkButton href={cancelHref} variant="default" size="md">
+              Cancel
+            </LinkButton>
+          ) : null}
         </Group>
       </Stack>
     </form>

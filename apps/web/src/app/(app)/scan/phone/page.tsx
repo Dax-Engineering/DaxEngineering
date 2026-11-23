@@ -5,7 +5,7 @@ import { getDepartments } from '../../inventory/issuing/_lib/data';
 import { PhonePanel } from './phone-panel';
 
 export default async function ScanWithPhonePage() {
-  const caps = await requirePermission('inventory.item.view');
+  const caps = await requirePermission('inventory.phone_scan.use');
   const can = (p: string) => canDo(caps, p);
   const access = {
     receive: can('inventory.grn.check'),

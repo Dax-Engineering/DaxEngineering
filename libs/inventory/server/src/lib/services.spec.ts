@@ -218,35 +218,43 @@ describe('ScanService', () => {
         item: {
           findUnique: async (args: { where: { qrToken: string } }) =>
             args.where.qrToken === ITEM_TOKEN ? { id: ITEM } : null,
-          findMany: async (args: { where: { partNoNorm: string } }) =>
-            args.where.partNoNorm === '1R0750'
-              ? [
-                  {
-                    id: ITEM,
-                    partNo: '1R-0750',
-                    description: 'Filter',
-                    brand: { name: 'Caterpillar' },
-                  },
-                  {
-                    id: OTHER,
-                    partNo: '1R0750',
-                    description: 'Filter',
-                    brand: { name: 'Fleetguard' },
-                  },
-                ]
-              : args.where.partNoNorm === 'ONLY1'
+          findMany: async (args: {
+            where: { partNoNorm?: string; qrToken?: { equals: string } };
+          }) =>
+            args.where.qrToken
+              ? args.where.qrToken.equals.toLowerCase() ===
+                ITEM_TOKEN.toLowerCase()
+                ? [{ id: ITEM }]
+                : []
+              : args.where.partNoNorm === '1R0750'
                 ? [
                     {
+                      id: ITEM,
+                      partNo: '1R-0750',
+                      description: 'Filter',
+                      brand: { name: 'Caterpillar' },
+                    },
+                    {
                       id: OTHER,
-                      partNo: 'ONLY-1',
-                      description: 'X',
-                      brand: { name: 'B' },
+                      partNo: '1R0750',
+                      description: 'Filter',
+                      brand: { name: 'Fleetguard' },
                     },
                   ]
-                : [],
+                : args.where.partNoNorm === 'ONLY1'
+                  ? [
+                      {
+                        id: OTHER,
+                        partNo: 'ONLY-1',
+                        description: 'X',
+                        brand: { name: 'B' },
+                      },
+                    ]
+                  : [],
         },
         bin: {
           findUnique: async () => null,
+          findMany: async () => [],
           findFirst: async (args: { where: { code: string } }) =>
             args.where.code === 'A-01-03-B' ? { id: OTHER } : null,
         },
@@ -260,16 +268,27 @@ describe('ScanService', () => {
   }
   const viewer = fakePolicy(['inventory.item.view', 'inventory.location.view']);
 
-  it('resolves QR URLs and bare tokens', async () => {
+  it('resolves label tokens, even typed with Caps Lock on', async () => {
     const path = `/inventory/items/${ITEM}`;
-    expect(
-      await scanner().resolve(viewer, `https://x.test/q/i/${ITEM_TOKEN}`),
-    ).toEqual({ type: 'item', id: ITEM, path });
     expect(await scanner().resolve(viewer, ITEM_TOKEN)).toEqual({
       type: 'item',
       id: ITEM,
       path,
     });
+    const flipped = [...ITEM_TOKEN]
+      .map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()))
+      .join('');
+    expect(await scanner().resolve(viewer, flipped)).toEqual({
+      type: 'item',
+      id: ITEM,
+      path,
+    });
+  });
+
+  it('no longer opens old QR label links', async () => {
+    expect(
+      await scanner().resolve(viewer, `https://x.test/q/i/${ITEM_TOKEN}`),
+    ).toEqual({ type: 'none' });
   });
 
   it('resolves barcodes, bin codes and part numbers', async () => {
@@ -299,9 +318,6 @@ describe('ScanService', () => {
       type: 'none',
     });
     expect(await scanner().resolve(binsOnly, '1R-0750')).toEqual({
-      type: 'none',
-    });
-    expect(await scanner().byToken(binsOnly, 'item', ITEM_TOKEN)).toEqual({
       type: 'none',
     });
   });

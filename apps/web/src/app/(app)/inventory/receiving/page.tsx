@@ -5,8 +5,6 @@ import {
   canDo,
   Chips,
   Empty,
-  type Kpi,
-  KpiTiles,
   LinkList,
   Mono,
   PageHead,
@@ -19,8 +17,6 @@ import { requirePermission } from '../../../../lib/server';
 import { getReceivingSummary, listGrns } from './_lib/data';
 import { BASE, grnPath } from './_lib/labels';
 import { GrnStatusPill } from './_lib/pills';
-
-const count = new Intl.NumberFormat('en-LK');
 
 const GRN_CHIPS = [
   { value: 'OPEN', label: 'Open' },
@@ -53,30 +49,7 @@ export default async function ReceivingPage({
     canGrns ? listGrns({ status: grnStatus, limit: '8' }) : null,
   ]);
 
-  const kpis: Kpi[] = summary
-    ? [
-        {
-          label: 'Drafts',
-          value: count.format(summary.drafts),
-          href: canGrns ? `${BASE}/grns?status=DRAFT` : undefined,
-        },
-        {
-          label: 'Waiting for put-away',
-          value: count.format(summary.awaitingPutaway),
-          tone: 'hi',
-          href: canGrns ? `${BASE}/putaway` : undefined,
-        },
-        {
-          label: 'Open discrepancies',
-          value: count.format(summary.openDiscrepancies),
-          tone: 'bad',
-          href: can('inventory.discrepancy.view')
-            ? `${BASE}/discrepancies`
-            : undefined,
-        },
-      ]
-    : [];
-
+  const n = (v: number | undefined) => (summary ? v : undefined);
   const tiles: ActionTileItem[] = [];
   if (can('inventory.grn.check'))
     tiles.push({
@@ -86,25 +59,32 @@ export default async function ReceivingPage({
       icon: 'truck',
       use: 'often',
     });
+  if (can('inventory.grn.check') && canGrns)
+    tiles.push({
+      href: `${BASE}/grns?status=DRAFT`,
+      title: 'Finish draft GRNs',
+      sub: 'Deliveries still being counted at the dock.',
+      icon: 'clipboard',
+      use: 'often',
+      count: n(summary?.drafts),
+    });
   if (can('inventory.grn.putaway'))
     tiles.push({
       href: `${BASE}/putaway`,
       title: 'Put away',
-      sub: summary
-        ? `${count.format(summary.awaitingPutaway)} waiting in the receiving bin.`
-        : 'Move received stock from the receiving bin to its shelf.',
+      sub: 'Move received stock from the receiving bin to its shelf.',
       icon: 'box',
       use: 'often',
+      count: n(summary?.awaitingPutaway),
     });
   if (can('inventory.discrepancy.view'))
     tiles.push({
       href: `${BASE}/discrepancies`,
       title: 'Discrepancies',
-      sub: summary?.openDiscrepancies
-        ? `${count.format(summary.openDiscrepancies)} open. Short, extra, damaged or wrong items.`
-        : 'Short, extra, damaged and wrong items for the supplier.',
+      sub: 'Short, extra, damaged and wrong items for the supplier.',
       icon: 'alert',
       use: 'sometimes',
+      count: n(summary?.openDiscrepancies),
     });
 
   return (
@@ -114,7 +94,6 @@ export default async function ReceivingPage({
         title="Receiving"
         lede="Check each delivery at the dock on a GRN, post it into the receiving bin, then put the stock away."
       />
-      {kpis.length ? <KpiTiles items={kpis} /> : null}
       {tiles.length ? (
         <SectionCard title="What would you like to do?">
           <ActionTiles items={tiles} />

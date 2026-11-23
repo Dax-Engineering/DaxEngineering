@@ -1,6 +1,5 @@
 import {
   Button,
-  Table,
   TableScrollContainer,
   TableTbody,
   TableTd,
@@ -18,6 +17,7 @@ import {
   PageHead,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { getRoles } from '../../../lib/data';
 import { requirePermission } from '../../../lib/server';
@@ -76,7 +76,7 @@ export default async function RolesPage({
           </div>
         ) : (
           <TableScrollContainer minWidth={640}>
-            <Table>
+            <ScrollTable>
               <TableThead>
                 <TableTr>
                   <TableTh>Role</TableTh>
@@ -116,7 +116,7 @@ export default async function RolesPage({
                   </TableTr>
                 ))}
               </TableTbody>
-            </Table>
+            </ScrollTable>
           </TableScrollContainer>
         )}
       </SectionCard>

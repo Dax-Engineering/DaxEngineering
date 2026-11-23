@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -18,6 +17,7 @@ import {
   Pager,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import {
   LabelSelection,
@@ -157,7 +157,7 @@ export default async function ItemsPage({
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     {canPrint ? (
@@ -252,7 +252,7 @@ export default async function ItemsPage({
                       : null}
                   </TableTbody>
                 ))}
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {page.items.map((item) => (

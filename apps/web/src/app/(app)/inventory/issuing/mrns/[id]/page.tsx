@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -18,6 +17,7 @@ import {
   PageHead,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { ConfirmAction } from '../../../../../../components/confirm-action';
 import { LinkButton } from '../../../../../../components/links';
@@ -128,7 +128,7 @@ function Lines({ mrn }: { mrn: MrnDto }) {
   return (
     <>
       <Box visibleFrom="md">
-        <Table>
+        <ScrollTable>
           <TableThead>
             <TableTr>
               <TableTh>Part</TableTh>
@@ -203,7 +203,7 @@ function Lines({ mrn }: { mrn: MrnDto }) {
               )),
             ])}
           </TableTbody>
-        </Table>
+        </ScrollTable>
       </Box>
       <Box hiddenFrom="md" className="dax-rows">
         {groups.flatMap((g) => [
@@ -329,6 +329,7 @@ export default async function MrnPage({
               <ConfirmAction
                 action={mrnStep}
                 payload={{ id: mrn.id, version: mrn.version, step: 'check' }}
+                primary
                 label="Check and reserve"
                 title="Check this MRN?"
                 message="Free stock is reserved for each line now. Anything not free waits until the Stores Manager assigns new stock."

@@ -8,7 +8,6 @@ export default async function NewRolePage() {
   return (
     <>
       <PageHead
-        eyebrow="Admin · Access"
         title="Add role"
         lede="You can set permissions and field access after the role is added."
         back={{ href: '/roles', label: 'Roles' }}

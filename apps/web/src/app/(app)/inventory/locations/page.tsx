@@ -1,11 +1,4 @@
-import {
-  Box,
-  Table,
-  TableTd,
-  TableTh,
-  TableThead,
-  TableTr,
-} from '@mantine/core';
+import { Box, TableTd, TableTh, TableThead, TableTr } from '@mantine/core';
 import Link from 'next/link';
 import type { BinDto } from '@dax/inventory-contract';
 import {
@@ -17,6 +10,7 @@ import {
   Pager,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import {
   LabelSelection,
@@ -162,7 +156,7 @@ export default async function LocationsPage({
           ) : (
             <>
               <Box visibleFrom="md">
-                <Table>
+                <ScrollTable>
                   <TableThead>
                     <TableTr>
                       {canPrint ? (
@@ -216,7 +210,7 @@ export default async function LocationsPage({
                       ))}
                     </ZoneTbody>
                   ))}
-                </Table>
+                </ScrollTable>
               </Box>
               <Box hiddenFrom="md" className="dax-rows">
                 {groups.map((group) => (

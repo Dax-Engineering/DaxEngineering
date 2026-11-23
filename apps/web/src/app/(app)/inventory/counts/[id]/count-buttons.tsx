@@ -58,7 +58,7 @@ export function CountReasonButton({
   return (
     <>
       <Button
-        variant="default"
+        variant={copy.color === 'red' ? 'light' : 'default'}
         color={copy.color}
         onClick={() => setOpened(true)}
       >

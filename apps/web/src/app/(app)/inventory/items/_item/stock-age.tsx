@@ -1,5 +1,4 @@
 import {
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -14,7 +13,7 @@ import {
   stockAgeBand,
   stockAgeBandLabels,
 } from '@dax/inventory-contract';
-import { CardBody, Empty, Mono, Pill } from '@dax/web-shell';
+import { CardBody, Empty, Mono, Pill, ScrollTable } from '@dax/web-shell';
 import { formatDateTime, formatQty } from '../../../../../lib/format';
 import { qtyNumber } from '../../receiving/_lib/lines';
 
@@ -70,7 +69,7 @@ export function StockAgeCard({ age, uom }: { age: ItemAge; uom: string }) {
         </CardBody>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <Table>
+          <ScrollTable>
             <TableThead>
               <TableTr>
                 <TableTh>On the shelf</TableTh>
@@ -108,12 +107,12 @@ export function StockAgeCard({ age, uom }: { age: ItemAge; uom: string }) {
                 );
               })}
             </TableTbody>
-          </Table>
+          </ScrollTable>
         </div>
       )}
       {age.out.items.length ? (
         <div style={{ overflowX: 'auto' }}>
-          <Table>
+          <ScrollTable>
             <TableThead>
               <TableTr>
                 <TableTh>Gone out</TableTh>
@@ -146,7 +145,7 @@ export function StockAgeCard({ age, uom }: { age: ItemAge; uom: string }) {
                 </TableTr>
               ))}
             </TableTbody>
-          </Table>
+          </ScrollTable>
           {age.out.total > age.out.items.length ? (
             <CardBody>
               <span className="dax-muted">

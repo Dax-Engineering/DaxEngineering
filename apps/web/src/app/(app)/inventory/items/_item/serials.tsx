@@ -1,9 +1,9 @@
 'use client';
 
 import {
+  Box,
   Checkbox,
   Group,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -14,7 +14,7 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 import type { SerialPage } from '@dax/inventory-contract';
-import { CardBody, Empty, Mono, Pill } from '@dax/web-shell';
+import { CardBody, Empty, Mono, Pill, ScrollTable } from '@dax/web-shell';
 import { SerialLabelsButton } from '../../../../../components/serial-labels';
 import { formatDateTime, formatQty } from '../../../../../lib/format';
 
@@ -51,7 +51,7 @@ export function SerialsCard({
 
   return (
     <>
-      {canPrint ? (
+      {canPrint && (page.unprinted || picked.size) ? (
         <CardBody>
           <Group gap="sm">
             {page.unprinted ? (
@@ -61,18 +61,70 @@ export function SerialsCard({
                 unprintedOnly
               />
             ) : null}
-            <SerialLabelsButton
-              scope={{ serialIds: [...picked] }}
-              label={`Print ${picked.size} selected`}
-              count={picked.size}
-              offerUnprinted={false}
-              disabled={picked.size === 0}
-            />
+            {picked.size ? (
+              <SerialLabelsButton
+                scope={{ serialIds: [...picked] }}
+                label={`Print ${picked.size} selected`}
+                count={picked.size}
+                offerUnprinted={false}
+              />
+            ) : null}
           </Group>
         </CardBody>
       ) : null}
-      <div style={{ overflowX: 'auto' }}>
-        <Table>
+      <Box hiddenFrom="md" className="dax-rows">
+        {page.items.map((s) => (
+          <div key={s.id} className="dax-row">
+            {canPrint ? (
+              <Checkbox
+                size="md"
+                aria-label={`Select ${s.serial}`}
+                checked={picked.has(s.id)}
+                onChange={(e) => toggle(s.id, e.currentTarget.checked)}
+                style={{ alignSelf: 'center' }}
+              />
+            ) : null}
+            <div className="dax-row-main">
+              <Link
+                href={`/inventory/serials/${s.serial}`}
+                className="dax-link"
+              >
+                <b>
+                  <Mono>{s.serial}</Mono>
+                </b>
+              </Link>
+              <span className="dax-sub">
+                {s.doc.number ? <Mono>{s.doc.number}</Mono> : 'Existing stock'}
+                {s.unitsOnLine > 1 ? ` · ${s.unitNo} of ${s.unitsOnLine}` : ''}
+                {s.bin ? (
+                  <>
+                    {' · '}
+                    <Mono>{s.bin.code}</Mono>
+                  </>
+                ) : null}
+              </span>
+              <span className="dax-sub">{formatDateTime(s.receivedAt)}</span>
+              <div className="dax-chips">
+                {s.printCount ? (
+                  <Pill tone="ok">Printed</Pill>
+                ) : (
+                  <Pill tone="yel">Not printed</Pill>
+                )}
+                {s.condition === 'DAMAGED' ? (
+                  <Pill tone="bad">Damaged</Pill>
+                ) : null}
+                {Number(s.qty) !== 1 ? (
+                  <Pill>
+                    {formatQty(s.qty)} {uom}
+                  </Pill>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ))}
+      </Box>
+      <Box visibleFrom="md" style={{ overflowX: 'auto' }}>
+        <ScrollTable>
           <TableThead>
             <TableTr>
               {canPrint ? <TableTh w={40} /> : null}
@@ -138,8 +190,8 @@ export function SerialsCard({
               </TableTr>
             ))}
           </TableTbody>
-        </Table>
-      </div>
+        </ScrollTable>
+      </Box>
       {page.total > page.items.length ? (
         <CardBody>
           <Text size="sm" c="dimmed">

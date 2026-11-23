@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -9,7 +8,14 @@ import {
 } from '@mantine/core';
 import Link from 'next/link';
 import type { ReturnDto, ReturnLineDto } from '@dax/inventory-contract';
-import { canDo, Facts, Mono, PageHead, SectionCard } from '@dax/web-shell';
+import {
+  canDo,
+  Facts,
+  Mono,
+  PageHead,
+  SectionCard,
+  ScrollTable,
+} from '@dax/web-shell';
 import { ConfirmAction } from '../../../../../components/confirm-action';
 import { LinkButton } from '../../../../../components/links';
 import { formatDateTime, formatQty } from '../../../../../lib/format';
@@ -85,7 +91,7 @@ function Lines({
   return (
     <>
       <Box visibleFrom="md">
-        <Table>
+        <ScrollTable>
           <TableThead>
             <TableTr>
               <TableTh>Part</TableTh>
@@ -125,7 +131,7 @@ function Lines({
               </TableTr>
             ))}
           </TableTbody>
-        </Table>
+        </ScrollTable>
       </Box>
       <Box hiddenFrom="md" className="dax-rows">
         {note.lines.map((l) => (
@@ -217,6 +223,7 @@ export default async function ReturnPage({
                 <ConfirmAction
                   action={returnStep}
                   payload={{ id: note.id, version: note.version, step: 'post' }}
+                  primary
                   label="Post return"
                   title="Post this return?"
                   message={

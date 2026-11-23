@@ -14,7 +14,6 @@ export default async function NewUserPage() {
   return (
     <>
       <PageHead
-        eyebrow="Admin · People"
         title="Add user"
         lede="They get an email with a link to set their password."
         back={{ href: '/users', label: 'Users' }}

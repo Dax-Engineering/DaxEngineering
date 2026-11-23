@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -17,6 +16,7 @@ import {
   PageHead,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { PrintLabelsButton } from '../../../../../../components/labels';
 import { BIN_KIND_LABELS, formatQty } from '../../../../../../lib/format';
@@ -76,7 +76,7 @@ export default async function BinPage({
         ) : (
           <>
             <Box visibleFrom="sm">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>Part number</TableTh>
@@ -98,7 +98,7 @@ export default async function BinPage({
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="sm" className="dax-rows">
               {bin.stock.map((row) => (

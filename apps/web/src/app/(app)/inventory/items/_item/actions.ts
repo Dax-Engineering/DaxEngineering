@@ -113,24 +113,23 @@ export async function saveItem(
       return { ok: false, error: STALE };
     }
     const changes = itemChanges(current, values);
-    if (Object.keys(changes).length === 0) {
-      return { ok: true, message: 'No changes to save.' };
+    if (Object.keys(changes).length) {
+      const parsed = ItemUpdate.safeParse({
+        ...changes,
+        version: current.version,
+      });
+      if (!parsed.success) return invalid(parsed.error);
+      await api.request(`${BASE}/${id}`, (d) => ItemDetail.parse(d), {
+        method: 'PATCH',
+        json: parsed.data,
+      });
     }
-    const parsed = ItemUpdate.safeParse({
-      ...changes,
-      version: current.version,
-    });
-    if (!parsed.success) return invalid(parsed.error);
-    await api.request(`${BASE}/${id}`, (d) => ItemDetail.parse(d), {
-      method: 'PATCH',
-      json: parsed.data,
-    });
   } catch (error) {
     return failure(error, 'Could not save the item.', CODES);
   }
   revalidatePath(BASE);
   revalidatePath(`${BASE}/${id}`);
-  return { ok: true, message: 'Saved.' };
+  redirect(`${BASE}/${id}`);
 }
 
 function done(id: string, message: string): ActionState {

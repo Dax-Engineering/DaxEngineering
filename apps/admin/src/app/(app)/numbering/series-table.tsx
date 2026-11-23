@@ -11,7 +11,7 @@ import {
 } from '@mantine/core';
 import { startTransition, useActionState, useState } from 'react';
 import type { NumberSeriesDto } from '@dax/platform-contract';
-import { Empty, Mono, Pill, SectionCard } from '@dax/web-shell';
+import { Empty, Mono, Pill, SectionCard, ScrollTable } from '@dax/web-shell';
 import { fieldError, IDLE } from '../../../lib/action-state';
 import { saveSeries } from './actions';
 
@@ -152,7 +152,7 @@ export function SeriesTable({
       note={`${series.length} document ${series.length === 1 ? 'type' : 'types'}`}
     >
       <Table.ScrollContainer minWidth={760}>
-        <Table verticalSpacing="sm">
+        <ScrollTable verticalSpacing="sm">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Document</Table.Th>
@@ -172,7 +172,7 @@ export function SeriesTable({
               />
             ))}
           </Table.Tbody>
-        </Table>
+        </ScrollTable>
       </Table.ScrollContainer>
     </SectionCard>
   );

@@ -13,7 +13,6 @@ export default async function SecurityPage() {
     <>
       <PageHead
         back={{ href: '/', label: 'Home' }}
-        eyebrow="Your account"
         title="Password and two-step sign-in"
       />
       <div className="dax-grid2">

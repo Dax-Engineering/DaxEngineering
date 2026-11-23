@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -20,6 +19,7 @@ import {
   PageHead,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { formatDateTime, formatQty } from '../../../../../lib/format';
 import { flatten, type SearchParams } from '../../../../../lib/query';
@@ -66,19 +66,16 @@ function BinRows({ bin, linked }: { bin: BinStockBin; linked: boolean }) {
     <TableTbody className="rpt-bin">
       {bin.lines.map((line, i) => (
         <TableTr key={line.item.id}>
-          {i === 0 ? (
-            <TableTd
-              rowSpan={bin.lines.length}
-              style={{ verticalAlign: 'top' }}
-            >
+          <TableTd style={{ verticalAlign: 'top' }}>
+            {i === 0 ? (
               <div className="dax-stack" style={{ gap: 4 }}>
                 <b>
                   <Mono>{bin.code}</Mono>
                 </b>
                 <Counting bin={bin} />
               </div>
-            </TableTd>
-          ) : null}
+            ) : null}
+          </TableTd>
           <TableTd>
             <PartNo item={line.item} linked={linked} />
           </TableTd>
@@ -107,10 +104,7 @@ export default async function StockByBinPage({
   const [zones, report] = await Promise.all([getZones(), getStockByBin(query)]);
   const linked = canDo(caps, 'inventory.item.view');
   const canExport = canDo(caps, 'inventory.stock.export');
-  const canPrintSerials =
-    canDo(caps, 'inventory.item.print_label') ||
-    canDo(caps, 'inventory.grn.post') ||
-    canDo(caps, 'inventory.grn.putaway');
+  const canPrintSerials = canDo(caps, 'inventory.serial.print_label');
   const shownBins = report.bins.map((b) => b.id).slice(0, 500);
   const groups = groupByZone(report.bins);
   const zone = zones.find((z) => z.id === query['zoneId']);
@@ -124,7 +118,6 @@ export default async function StockByBinPage({
     <>
       <style>{PRINT_CSS}</style>
       <PageHead
-        eyebrow="Reports"
         title="Stock by bin"
         back={{ href: BASE, label: 'Reports' }}
         lede="Every bin with stock and what should be in it. Bins being counted are frozen until the count is posted."
@@ -192,7 +185,7 @@ export default async function StockByBinPage({
           note={`${group.bins.length} ${group.bins.length === 1 ? 'bin' : 'bins'} · ${group.lineCount} ${group.lineCount === 1 ? 'line' : 'lines'}`}
         >
           <Box visibleFrom="md" className="rpt-table">
-            <Table>
+            <ScrollTable>
               <TableThead>
                 <TableTr>
                   <TableTh>Bin</TableTh>
@@ -206,7 +199,7 @@ export default async function StockByBinPage({
               {group.bins.map((bin) => (
                 <BinRows key={bin.id} bin={bin} linked={linked} />
               ))}
-            </Table>
+            </ScrollTable>
           </Box>
           <Box hiddenFrom="md" className="dax-rows rpt-rows">
             {group.bins.map((bin) => (

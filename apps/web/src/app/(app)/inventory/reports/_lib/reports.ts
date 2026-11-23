@@ -7,7 +7,7 @@ export const REPORTS = {
     title: 'Below minimum',
     sub: 'Parts whose free stock is under the minimum, with what is already asked for.',
     icon: 'alert',
-    use: 'often',
+    use: 'sometimes',
     view: 'inventory.stock.view',
     export: 'inventory.stock.export',
   },
@@ -28,7 +28,7 @@ export const REPORTS = {
     export: 'inventory.stock.export',
   },
   'stock-age': {
-    title: 'Stock age',
+    title: 'Age analysis',
     sub: 'How long the stock on the shelf has been in the store, in age bands.',
     icon: 'history',
     use: 'sometimes',

@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import QRCode from 'qrcode';
+import { code128Bars, code128Modules } from '@dax/inventory-contract';
 
 export const LABEL_SHEET = {
   pageWidthMm: 210,
@@ -13,8 +13,8 @@ export const LABEL_SHEET = {
   gapXMm: 0,
   gapYMm: 0,
   paddingMm: 3,
-  qrSizeMm: 28,
-  qrQuietModules: 2,
+  barcodeHeightMm: 11,
+  quietModules: 10,
 } as const;
 
 export type SheetGeometry = typeof LABEL_SHEET;
@@ -59,7 +59,8 @@ export function withCopies<T>(labels: readonly T[], copies: number): T[] {
 export type LabelContent =
   | {
       kind: 'item';
-      url: string;
+      /** Label token, encoded in the Code 128 barcode. */
+      token: string;
       partNo: string;
       brand: string;
       description: string;
@@ -67,7 +68,7 @@ export type LabelContent =
     }
   | {
       kind: 'bin';
-      url: string;
+      token: string;
       code: string;
       zone: string;
       binKind: string | null;
@@ -78,26 +79,19 @@ export const mm = (value: number) => value * PT_PER_MM;
 
 type Doc = PDFKit.PDFDocument;
 
-function drawQr(doc: Doc, url: string, x: number, y: number, size: number) {
-  const matrix = QRCode.create(url, { errorCorrectionLevel: 'M' }).modules;
-  const quiet = LABEL_SHEET.qrQuietModules;
-  const module = size / (matrix.size + quiet * 2);
-  for (let r = 0; r < matrix.size; r++) {
-    let c = 0;
-    while (c < matrix.size) {
-      if (!matrix.get(r, c)) {
-        c++;
-        continue;
-      }
-      const start = c;
-      while (c < matrix.size && matrix.get(r, c)) c++;
-      doc.rect(
-        x + (start + quiet) * module,
-        y + (r + quiet) * module,
-        (c - start) * module,
-        module,
-      );
-    }
+/** Code 128 bars across `w`, `h` tall, with quiet zones inside the width. */
+function drawBarcode(
+  doc: Doc,
+  text: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  const quiet = LABEL_SHEET.quietModules;
+  const module = w / (code128Modules(text) + quiet * 2);
+  for (const [start, width] of code128Bars(text)) {
+    doc.rect(x + (start + quiet) * module, y, width * module, h);
   }
   doc.fillColor('black').fill();
 }
@@ -148,27 +142,26 @@ function drawText(
   w: number,
 ) {
   if (label.kind === 'item') {
-    const size = fitSize(doc, label.partNo, 'Helvetica-Bold', w, 11, 7);
+    const size = fitSize(doc, label.partNo, 'Helvetica-Bold', w, 13, 8);
     let next = line(doc, label.partNo, 'Helvetica-Bold', size, x, y, w);
-    next = line(doc, label.brand, 'Helvetica', 8, x, next, w);
-    next = line(doc, label.description, 'Helvetica', 7, x, next, w, 3);
-    line(doc, label.uom, 'Helvetica', 7, x, next, w);
-    return;
-  }
-  const size = fitSize(doc, label.code, 'Helvetica-Bold', w, 16, 8);
-  let next = line(doc, label.code, 'Helvetica-Bold', size, x, y, w);
-  next = line(doc, label.zone, 'Helvetica', 8, x, next, w, 2);
-  if (label.binKind) {
-    line(
+    next = line(
       doc,
-      BIN_KIND_LABEL[label.binKind] ?? label.binKind,
-      'Helvetica-Bold',
+      `${label.brand} · ${label.uom}`,
+      'Helvetica',
       8,
       x,
       next,
       w,
     );
+    line(doc, label.description, 'Helvetica', 7, x, next, w, 2);
+    return;
   }
+  const size = fitSize(doc, label.code, 'Helvetica-Bold', w, 18, 9);
+  const next = line(doc, label.code, 'Helvetica-Bold', size, x, y, w);
+  const kind = label.binKind
+    ? ` · ${BIN_KIND_LABEL[label.binKind] ?? label.binKind}`
+    : '';
+  line(doc, `${label.zone}${kind}`, 'Helvetica', 8, x, next, w);
 }
 
 export function renderLabels(
@@ -190,8 +183,8 @@ export function renderLabels(
   });
 
   const slots = labelSlots(labels.length, skip, g);
-  const qr = mm(g.qrSizeMm);
   const pad = mm(g.paddingMm);
+  const barH = mm(g.barcodeHeightMm);
   let page = -1;
   labels.forEach((label, i) => {
     const slot = slots[i];
@@ -200,14 +193,20 @@ export function renderLabels(
       doc.addPage({ size: [mm(g.pageWidthMm), mm(g.pageHeightMm)], margin: 0 });
       page++;
     }
-    const x = mm(slot.xMm);
+    const x = mm(slot.xMm) + pad;
     const y = mm(slot.yMm);
-    const cellH = mm(g.cellHeightMm);
-    const qrY = y + (cellH - qr) / 2;
-    drawQr(doc, label.url, x + pad, qrY, qr);
-    const textX = x + pad + qr + mm(2);
-    const textW = mm(g.cellWidthMm) - (textX - x) - pad;
-    drawText(doc, label, textX, qrY + mm(1), textW);
+    const w = mm(g.cellWidthMm) - pad * 2;
+    const bottom = y + mm(g.cellHeightMm) - pad;
+    drawText(doc, label, x, y + pad, w);
+    doc.font('Courier').fontSize(7);
+    const tokenH = doc.currentLineHeight(true);
+    const barY = bottom - tokenH - mm(0.6) - barH;
+    drawBarcode(doc, label.token, x, barY, w, barH);
+    doc.fillColor('black').text(label.token, x, bottom - tokenH, {
+      width: w,
+      align: 'center',
+      lineGap: 0,
+    });
   });
   if (page < 0) doc.addPage();
   doc.end();
