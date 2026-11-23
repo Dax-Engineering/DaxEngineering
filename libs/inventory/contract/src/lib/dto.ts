@@ -39,11 +39,6 @@ export function binCode(parts: {
   ].join('-');
 }
 
-export const QR_PATHS = { item: 'i', bin: 'b' } as const;
-export function qrUrl(origin: string, kind: 'item' | 'bin', token: string) {
-  return `${origin}/q/${QR_PATHS[kind]}/${token}`;
-}
-
 const Ref = z.object({ id: z.uuid(), name: z.string() });
 const ItemRef = z.object({
   id: z.uuid(),
@@ -501,7 +496,8 @@ export type ItemStatusInput = z.infer<typeof ItemStatusInput>;
 export const SPECIAL_ZONE_CODE = 'X';
 export const ITEM_CSV_MAX_ROWS = 5000;
 export const ITEM_CSV_MAX_BYTES = 2 * 1024 * 1024;
-export const QR_TOKEN_PATTERN = /^[A-Za-z0-9]{12}$/;
+/** The code in a part or bin label's Code 128 barcode. */
+export const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9]{12}$/;
 
 export const InventorySummary = z.object({
   items: z.int(),

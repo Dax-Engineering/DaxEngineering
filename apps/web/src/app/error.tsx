@@ -1,18 +1,27 @@
 'use client';
 
 import { Button } from '@mantine/core';
-import { AuthCard } from '@dax/web-shell';
+import { Icon, StatusPage } from '@dax/web-shell';
 
 export default function RootError({ reset }: { reset: () => void }) {
   return (
-    <AuthCard
-      product="DAX"
+    <StatusPage
+      scene="error"
       title="Can't load this page"
-      description="The server may still be starting up, or the connection dropped. Wait a moment and try again."
+      alert
+      full
+      actions={
+        <Button
+          size="md"
+          onClick={reset}
+          leftSection={<Icon name="refresh" size={18} />}
+        >
+          Try again
+        </Button>
+      }
     >
-      <Button fullWidth onClick={reset}>
-        Try again
-      </Button>
-    </AuthCard>
+      The server may still be starting up, or the connection dropped. Wait a
+      moment and try again.
+    </StatusPage>
   );
 }

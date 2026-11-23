@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -18,6 +17,7 @@ import {
   Pager,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { ConfirmAction } from '../../../../components/confirm-action';
 import { ImportScreen } from '../../../../components/import-screen';
@@ -123,7 +123,7 @@ export async function PartyListPage({
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>Code</TableTh>
@@ -164,7 +164,7 @@ export async function PartyListPage({
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {items.map((p) => (
@@ -212,7 +212,6 @@ export async function PartyNewPage({ kind }: { kind: PartyKind }) {
     <>
       <PageHead
         back={{ href: config.base, label: config.title }}
-        eyebrow={EYEBROW}
         title={`New ${config.noun}`}
         lede="The code is given automatically when you save."
       />
@@ -320,7 +319,6 @@ export async function PartyImportPage({ kind }: { kind: PartyKind }) {
     <>
       <PageHead
         back={{ href: config.base, label: config.title }}
-        eyebrow={EYEBROW}
         title={`Import ${config.noun}s`}
         lede={`Add many ${config.noun}s at once from a CSV file.`}
       />

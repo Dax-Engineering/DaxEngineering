@@ -12,6 +12,7 @@ export function ConfirmAction<P>({
   message,
   confirmLabel,
   color,
+  primary,
 }: {
   action: (prev: ActionState, payload: P) => Promise<ActionState>;
   payload: P;
@@ -20,6 +21,8 @@ export function ConfirmAction<P>({
   message: string;
   confirmLabel?: string;
   color?: string;
+  /** The page's main next step: a filled button. */
+  primary?: boolean;
 }) {
   const [opened, setOpened] = useState(false);
   const [state, dispatch, pending] = useActionState(
@@ -33,7 +36,11 @@ export function ConfirmAction<P>({
 
   return (
     <>
-      <Button variant="default" color={color} onClick={() => setOpened(true)}>
+      <Button
+        variant={primary ? 'filled' : color === 'red' ? 'light' : 'default'}
+        color={color}
+        onClick={() => setOpened(true)}
+      >
         {label}
       </Button>
       <Modal

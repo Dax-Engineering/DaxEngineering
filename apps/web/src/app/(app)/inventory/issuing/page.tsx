@@ -5,8 +5,6 @@ import {
   canDo,
   Chips,
   Empty,
-  type Kpi,
-  KpiTiles,
   LinkList,
   Mono,
   PageHead,
@@ -18,8 +16,6 @@ import { requirePermission } from '../../../../lib/server';
 import { getIssuingSummary, listMrns } from './_lib/data';
 import { BASE, MRN_SUBTYPE_LABELS, mrnPath } from './_lib/labels';
 import { MrnStatusPill, WaitingPill } from './_lib/pills';
-
-const count = new Intl.NumberFormat('en-LK');
 
 const CHIPS = [
   { value: 'OPEN', label: 'Open' },
@@ -52,56 +48,7 @@ export default async function IssuingPage({
     canMrns ? listMrns({ status, limit: '10' }) : null,
   ]);
 
-  const mrnLink = (s: string) =>
-    canMrns ? `${BASE}/mrns?status=${s}` : undefined;
-  const aodLink = (s: string) =>
-    canAods ? `${BASE}/aods?status=${s}` : undefined;
-  const kpis: Kpi[] = summary
-    ? [
-        {
-          label: 'To check',
-          value: count.format(summary.mrnToCheck),
-          tone: 'int',
-          href: mrnLink('SUBMITTED'),
-        },
-        {
-          label: 'Waiting for stock',
-          value: count.format(summary.mrnWaiting),
-          tone: 'hi',
-          href: mrnLink('WAITING'),
-        },
-        {
-          label: 'Ready to pick',
-          value: count.format(summary.mrnReady),
-          tone: 'ok',
-          href: mrnLink('READY'),
-        },
-        {
-          label: 'Picking',
-          value: count.format(summary.picking),
-          href: aodLink('PICKING'),
-        },
-        {
-          label: 'Awaiting approval',
-          value: count.format(summary.awaitingApproval),
-          tone: 'yel',
-          href: aodLink('PENDING_APPROVAL'),
-        },
-        {
-          label: 'Approved, to issue',
-          value: count.format(summary.approved),
-          tone: 'int',
-          href: aodLink('APPROVED'),
-        },
-        {
-          label: 'Awaiting signature',
-          value: count.format(summary.awaitingSignature),
-          tone: 'bad',
-          href: aodLink('ISSUED'),
-        },
-      ]
-    : [];
-
+  const n = (v: number | undefined) => (summary ? v : undefined);
   const tiles: ActionTileItem[] = [];
   if (can('inventory.mrn.create'))
     tiles.push({
@@ -111,55 +58,77 @@ export default async function IssuingPage({
       icon: 'plus',
       use: 'often',
     });
+  if (can('inventory.mrn.check') && canMrns)
+    tiles.push({
+      href: `${BASE}/mrns?status=SUBMITTED`,
+      title: 'Check MRNs',
+      sub: 'Check new MRNs and reserve what is free.',
+      icon: 'clipboard',
+      use: 'often',
+      count: n(summary?.mrnToCheck),
+    });
   if (can('inventory.aod.issue'))
     tiles.push({
       href: `${BASE}/mrns?status=READY`,
       title: 'Pick and issue AOD',
-      sub: summary
-        ? `${count.format(summary.mrnReady)} ready. Pick parts and print the AOD.`
-        : 'Pick reserved parts and print the AOD.',
+      sub: 'MRNs ready to pick. Pick parts and print the AOD.',
       icon: 'send',
       use: 'often',
+      count: n(summary?.mrnReady),
+    });
+  if (can('inventory.aod.issue') && canAods)
+    tiles.push({
+      href: `${BASE}/aods?status=PICKING`,
+      title: 'Continue picking',
+      sub: 'AODs still being picked.',
+      icon: 'box',
+      use: 'often',
+      count: n(summary?.picking),
+    });
+  if (can('inventory.aod.issue') && canAods)
+    tiles.push({
+      href: `${BASE}/aods?status=APPROVED`,
+      title: 'Issue approved AODs',
+      sub: 'Approved and ready to issue and print.',
+      icon: 'check',
+      use: 'often',
+      count: n(summary?.approved),
     });
   if (can('inventory.mrn.allocate'))
     tiles.push({
       href: `${BASE}/mrns?status=WAITING`,
       title: 'Waiting for stock',
-      sub: summary
-        ? `${count.format(summary.mrnWaiting)} MRNs waiting for stock.`
-        : 'Assign newly arrived stock to waiting MRNs.',
+      sub: 'Assign newly arrived stock to waiting MRNs.',
       icon: 'history',
       use: 'often',
+      count: n(summary?.mrnWaiting),
     });
   if (can('inventory.aod.approve'))
     tiles.push({
       href: `${BASE}/aods?status=PENDING_APPROVAL`,
       title: 'Approve AODs',
-      sub: summary
-        ? `${count.format(summary.awaitingApproval)} waiting for your approval before Stores issues them.`
-        : 'Approve or reject AODs before Stores issues and prints them.',
+      sub: 'Waiting for your approval before Stores issues them.',
       icon: 'check',
       use: 'often',
+      count: n(summary?.awaitingApproval),
     });
   if (canAods)
     tiles.push({
       href: `${BASE}/aods?status=ISSUED`,
       title: 'Awaiting signature',
-      sub: summary
-        ? `${count.format(summary.awaitingSignature)} AODs need their signed copy.`
-        : 'Upload signed copies to complete AODs.',
+      sub: 'Issued AODs that need their signed copy uploaded.',
       icon: 'edit',
       use: 'often',
+      count: n(summary?.awaitingSignature),
     });
   if (can('inventory.hold.view'))
     tiles.push({
       href: `${BASE}/holds`,
       title: 'Holds',
-      sub: summary
-        ? `${count.format(summary.activeHolds)} active. Stock kept aside.`
-        : 'Stock kept aside for a customer or job.',
+      sub: 'Active holds. Stock kept aside for a customer or job.',
       icon: 'lock',
       use: 'sometimes',
+      count: n(summary?.activeHolds),
     });
 
   return (
@@ -169,7 +138,6 @@ export default async function IssuingPage({
         title="Issuing"
         lede="MRNs are checked and reserved, picked onto an AOD, approved, issued, then completed with the signed copy."
       />
-      {kpis.length ? <KpiTiles items={kpis} /> : null}
       {tiles.length ? (
         <SectionCard title="What would you like to do?">
           <ActionTiles items={tiles} />

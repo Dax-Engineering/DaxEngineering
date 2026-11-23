@@ -14,7 +14,6 @@ export default async function LowStockEmailsPage() {
   return (
     <>
       <PageHead
-        eyebrow="Reports"
         title="Low-stock emails"
         back={{ href: `${BASE}/below-minimum`, label: 'Below minimum' }}
         lede="Department heads who may receive low-stock emails get a weekly list of every part below its minimum. You can also email each part the moment it drops below."

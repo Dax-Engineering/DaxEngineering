@@ -34,9 +34,6 @@ const EnvSchema = z
     INTERNAL_TOKEN_ADMIN: Secret,
     WEB_ORIGIN: Origin,
     ADMIN_ORIGIN: Origin,
-    // Printed in label QR codes. Set it to the production web address so labels
-    // printed from any machine open on phones; defaults to WEB_ORIGIN.
-    LABEL_ORIGIN: blankAsUnset(Origin),
     S3_ENDPOINT: blankAsUnset(z.url()),
     S3_BUCKET: blankAsUnset(z.string().min(3).max(63)),
     S3_ACCESS_KEY_ID: blankAsUnset(z.string().min(1)),

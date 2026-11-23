@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -17,6 +16,7 @@ import {
   PageHead,
   Pager,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { LinkButton } from '../../../../../components/links';
 import { ListFilters } from '../../../../../components/list-filters';
@@ -51,7 +51,6 @@ export default async function MrnListPage({
     <>
       <PageHead
         back={{ href: BASE, label: 'Issuing' }}
-        eyebrow="Issuing"
         title="MRNs"
         lede="Material request notes from departments. Checking reserves what is free; the rest waits."
         actions={
@@ -90,7 +89,7 @@ export default async function MrnListPage({
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>MRN</TableTh>
@@ -122,7 +121,7 @@ export default async function MrnListPage({
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {page.items.map((m) => (

@@ -133,7 +133,7 @@ export class ItemsController {
   }
 
   @Put(':id/supersession')
-  @Requires('inventory.item.edit')
+  @Requires('inventory.item.supersede')
   supersede(
     @Req() req: DaxRequest,
     @Param('id', ParseUUIDPipe) id: string,

@@ -30,7 +30,6 @@ export default async function EditWarrantyTagPage({
     <>
       <PageHead
         back={{ href: tagPath(id), label: tag.number }}
-        eyebrow="Warranty bin"
         title={
           <>
             Edit <Mono>{tag.number}</Mono>

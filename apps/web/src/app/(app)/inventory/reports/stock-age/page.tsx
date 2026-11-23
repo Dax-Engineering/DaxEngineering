@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -12,7 +11,14 @@ import {
   type StockAgeRow,
   stockAgeBandLabels,
 } from '@dax/inventory-contract';
-import { canDo, CardBody, Empty, PageHead, SectionCard } from '@dax/web-shell';
+import {
+  canDo,
+  CardBody,
+  Empty,
+  PageHead,
+  SectionCard,
+  ScrollTable,
+} from '@dax/web-shell';
 import { ListFilters } from '../../../../../components/list-filters';
 import { LinkButton } from '../../../../../components/links';
 import { formatQty } from '../../../../../lib/format';
@@ -64,8 +70,7 @@ export default async function StockAgePage({
   return (
     <>
       <PageHead
-        eyebrow="Reports"
-        title="Stock age"
+        title="Age analysis"
         back={{ href: BASE, label: 'Reports' }}
         lede="How long the stock on the shelf has been in the store, oldest first. The oldest units count as issued first. Returned parts keep the age they left with. Opening stock counts from the opening count, so its real age may be higher."
         actions={
@@ -131,7 +136,7 @@ export default async function StockAgePage({
         ) : (
           <>
             <Box visibleFrom="md" style={{ overflowX: 'auto' }}>
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>Part number</TableTh>
@@ -170,7 +175,7 @@ export default async function StockAgePage({
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {report.items.map((row) => (

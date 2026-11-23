@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -17,6 +16,7 @@ import {
   Pager,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { LinkButton } from '../../../../../components/links';
 import { ListFilters } from '../../../../../components/list-filters';
@@ -41,7 +41,6 @@ export default async function GrnListPage({
     <>
       <PageHead
         back={{ href: BASE, label: 'Receiving' }}
-        eyebrow="Receiving"
         title="GRNs"
         lede="Drafts are counted at the dock. Posting assigns the GRN number and brings the stock in."
         actions={
@@ -89,7 +88,7 @@ export default async function GrnListPage({
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>GRN</TableTh>
@@ -127,7 +126,7 @@ export default async function GrnListPage({
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {page.items.map((g) => (

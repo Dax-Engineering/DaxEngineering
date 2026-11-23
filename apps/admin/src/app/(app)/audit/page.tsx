@@ -8,7 +8,7 @@ import {
   TextInput,
 } from '@mantine/core';
 import { AdminUserList, AuditPage } from '@dax/platform-contract';
-import { canDo, PageHead, Pager, SectionCard } from '@dax/web-shell';
+import { canDo, PageHead, Pager, SectionCard, DayInput } from '@dax/web-shell';
 import { getCatalog } from '../../../lib/data';
 import { unlessForbidden } from '../../../lib/load';
 import { api, requirePermission } from '../../../lib/server';
@@ -98,18 +98,12 @@ export default async function AuditLogPage({
               placeholder="For example update"
               defaultValue={filters.action ?? ''}
             />
-            <TextInput
+            <DayInput
               name="from"
-              type="date"
               label="From"
               defaultValue={filters.from ?? ''}
             />
-            <TextInput
-              name="to"
-              type="date"
-              label="To"
-              defaultValue={filters.to ?? ''}
-            />
+            <DayInput name="to" label="To" defaultValue={filters.to ?? ''} />
           </SimpleGrid>
           <Group mt="md" gap="sm">
             <Button type="submit">Filter</Button>

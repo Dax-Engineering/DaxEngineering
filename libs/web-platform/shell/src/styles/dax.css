@@ -7,7 +7,7 @@
   --dax-ink: #12232a;
   --dax-brand: #162568;
   --dax-logo: #312f94;
-  --dax-muted: #6b7680;
+  --dax-muted: #5f6a74;
   --dax-on-ink: #ffffff;
   --dax-hi: #ee7a12;
   --dax-hi-soft: #fff2e5;
@@ -72,7 +72,8 @@
   --dax-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
 }
 
-:root {
+:root,
+:root[data-mantine-color-scheme] {
   --mantine-color-body: var(--dax-bg);
   --mantine-color-text: var(--dax-ink);
   --mantine-color-dimmed: var(--dax-muted);
@@ -267,6 +268,58 @@ body {
 .dax-rail a:hover .tip,
 .dax-rail a:focus-visible .tip {
   opacity: 1;
+}
+.dax-rail-toggle {
+  width: 40px;
+  height: 40px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dax-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font: inherit;
+}
+.dax-rail-toggle:hover {
+  background: var(--dax-soft);
+  color: var(--dax-ink);
+}
+.dax-rail-toggle .dax-ico {
+  transform: rotate(-90deg);
+}
+.dax-shell.rail-open {
+  grid-template-columns: 208px minmax(0, 1fr);
+}
+.rail-open .dax-rail {
+  align-items: stretch;
+  gap: 8px;
+}
+.rail-open .dax-rail a,
+.rail-open .dax-rail-toggle {
+  width: auto;
+  height: 48px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+}
+.rail-open .dax-rail a .name,
+.rail-open .dax-rail-toggle .name {
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rail-open .dax-rail-toggle {
+  height: 40px;
+  font-size: 13px;
+}
+.rail-open .dax-rail-toggle .dax-ico {
+  transform: rotate(90deg);
 }
 .dax-bottom {
   display: none;
@@ -660,6 +713,7 @@ a.dax-kpi:hover {
 .dax-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .dax-sub {
   display: block;
@@ -784,6 +838,7 @@ button.dax-cta {
   align-items: center;
   flex: 0 1 560px;
   min-width: min(340px, 100%);
+  margin-left: auto;
 }
 
 /* Filters and toolbars inside a card */
@@ -795,6 +850,10 @@ button.dax-cta {
 }
 .dax-card.flush > .dax-card-tools {
   padding: 0 26px;
+}
+/* The toolbar stacks its parts, so a search box's flex width would become its height. */
+.dax-card-tools > .dax-search {
+  flex: 0 0 auto;
 }
 .dax-card.flush > .dax-card-h + .dax-card-tools {
   margin-top: 0;
@@ -3224,4 +3283,316 @@ td.dax-bundle-cell .n {
 .dax-serial.void {
   text-decoration: line-through;
   color: var(--dax-muted);
+}
+
+/* Form rows: fields side by side share a bottom edge, so a hint under one
+   label doesn't push its box lower than its neighbour's. */
+.mantine-SimpleGrid-root > .mantine-InputWrapper-root,
+.mantine-Group-root > .mantine-InputWrapper-root {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-self: stretch;
+}
+
+/* Error and not-found pages: the animation and the way out, centred on the page. */
+.dax-error {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 220px);
+  padding: 24px 0;
+}
+.dax-error-body {
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.dax-error.full {
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+.dax-status-art {
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 4 / 3;
+}
+.dax-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.dax-error-body h1 {
+  margin: 8px 0 0;
+  font-size: clamp(26px, 3.2vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.dax-error-body p {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--dax-muted);
+  font-size: 16px;
+  line-height: 1.55;
+}
+.dax-error-body .dax-error-ref {
+  font-size: 13px;
+}
+
+/* Waiting-work count on an action tile */
+.dax-tile {
+  position: relative;
+}
+.dax-tile .count {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  background: var(--dax-brand);
+  color: var(--dax-on-ink);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dax-tile .count.zero {
+  background: var(--dax-soft);
+  color: var(--dax-muted);
+}
+
+/* Tabs within a page (part page: Overview, Serials, ...) */
+.dax-pagetabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--dax-panel);
+  box-shadow: var(--dax-shadow-card);
+  overflow-x: auto;
+  scrollbar-width: none;
+  align-self: flex-start;
+  max-width: 100%;
+}
+.dax-pagetabs a {
+  flex: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  color: var(--dax-muted);
+  font-weight: 600;
+  font-size: 14.5px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dax-pagetabs a:hover {
+  color: var(--dax-ink);
+  background: var(--dax-soft);
+}
+.dax-pagetabs a[aria-current='page'] {
+  background: var(--dax-brand);
+  color: var(--dax-on-ink);
+}
+@media (max-width: 760px) {
+  .dax-pagetabs {
+    align-self: stretch;
+  }
+  .dax-pagetabs a {
+    padding: 10px 14px;
+  }
+}
+
+/* List filters: search, then dropdowns (folded behind "Filters" on phones) */
+.dax-filter-q {
+  flex: 1 1 240px;
+  max-width: 460px;
+}
+.dax-filter-select {
+  flex: 1 1 180px;
+  max-width: 260px;
+}
+.dax-filter-more {
+  display: contents;
+}
+.dax-filter-toggle {
+  display: none;
+}
+@media (max-width: 760px) {
+  .dax-filters {
+    flex-wrap: wrap;
+  }
+  .dax-filter-q {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+  .dax-filter-toggle {
+    display: inline-flex;
+  }
+  /* The keyboard's search key submits on phones */
+  .dax-filter-go {
+    display: none;
+  }
+  .dax-filter-more.foldable {
+    display: none;
+  }
+  .dax-filter-more.foldable.open {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+  .dax-filter-more .dax-filter-select {
+    max-width: none;
+    min-width: 0;
+  }
+}
+
+/* Phones: show the whole list line, two tiles per row, bigger tap targets */
+@media (max-width: 760px) {
+  .dax-list .t,
+  .dax-list .s {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .dax-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .dax-tile {
+    padding: 14px;
+    border-radius: 18px;
+    gap: 4px;
+  }
+  .dax-tile .badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+  .dax-tile b {
+    font-size: 15px;
+  }
+  .dax-tile .sub {
+    font-size: 12.5px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .dax-tile .count {
+    top: 12px;
+    right: 12px;
+    min-width: 26px;
+    height: 26px;
+    font-size: 13px;
+  }
+}
+@media (pointer: coarse) {
+  .dax-row a.dax-link,
+  .dax-row .dax-row-main > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+  .dax-row .mantine-Checkbox-input,
+  .mantine-Table-td .mantine-Checkbox-input {
+    --checkbox-size: 28px;
+    width: 28px;
+    height: 28px;
+  }
+  .mantine-PasswordInput-visibilityToggle {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* Key to the tile colours */
+.dax-tile-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 20px;
+  margin-top: 8px;
+}
+.dax-tile-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.dax-tile-key i {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: none;
+  box-shadow: inset 0 0 0 1px var(--dax-line-strong);
+}
+.dax-tile-key i.orange {
+  background: var(--dax-tint-orange);
+  box-shadow: inset 0 0 0 1.5px
+    color-mix(in srgb, var(--dax-hi) 55%, transparent);
+}
+.dax-tile-key i.blue {
+  background: var(--dax-tint-blue);
+  box-shadow: inset 0 0 0 1.5px
+    color-mix(in srgb, var(--dax-int) 55%, transparent);
+}
+.dax-tile-key i.gray {
+  background: var(--dax-tint-gray);
+  box-shadow: inset 0 0 0 1.5px var(--dax-line-strong);
+}
+
+/* Tables scroll sideways inside their card instead of squashing.
+   The edge shadows show only while there is more to scroll that way. */
+.dax-table-scroll {
+  --scroll-bg: var(--dax-panel);
+  --scroll-shade: color-mix(in srgb, var(--dax-ink) 14%, transparent);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  max-width: 100%;
+  background:
+    linear-gradient(to right, var(--scroll-bg) 40%, transparent) left / 48px
+      100% no-repeat local,
+    linear-gradient(to left, var(--scroll-bg) 40%, transparent) right / 48px
+      100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--scroll-shade), transparent)
+      left / 16px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--scroll-shade), transparent)
+      right / 16px 100% no-repeat scroll;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dax-line-strong) transparent;
+}
+.dax-table-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.dax-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dax-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--dax-line-strong);
+  border-radius: 999px;
+}
+.dax-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--dax-muted);
+}
+.dax-table-scroll > .mantine-Table-table {
+  min-width: 100%;
+}
+/* Headings, codes and numbers stay on one line, so a narrow card scrolls
+   rather than breaking them over several lines. */
+.dax-table-scroll th,
+.dax-table-scroll .dax-mono {
+  white-space: nowrap;
+}
+@media print {
+  .dax-table-scroll {
+    overflow: visible;
+    background: none;
+  }
 }

@@ -14,7 +14,6 @@ export default async function NewWarrantyTagPage() {
     <>
       <PageHead
         back={{ href: BASE, label: 'Warranty bin' }}
-        eyebrow="Warranty bin"
         title="Tag a failed part"
         lede="Record the failed part and its fault, then put it in the warranty bin. A tag number is given when you save."
       />

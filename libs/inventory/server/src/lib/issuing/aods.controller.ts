@@ -45,7 +45,7 @@ export class AodsController {
   }
 
   @Get(':id/pdf')
-  @Requires('inventory.aod.view')
+  @Requires('inventory.aod.print')
   @Header('Cache-Control', 'no-store')
   async pdf(
     @Req() req: DaxRequest,

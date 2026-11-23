@@ -9,7 +9,7 @@ import { can, type Policy } from '@dax/platform-core';
 import { PrismaService } from '@dax/platform-db';
 import { extractGtin, gtinForms } from './phone-scan/barcode-info';
 import { MainStore } from './main-store.service';
-import { looksLikeBinCode, parseScanCode, type QrKind } from './scan-code';
+import { type LabelKind, looksLikeBinCode, parseScanCode } from './scan-code';
 
 const NONE: ScanResult = { type: 'none' };
 const MAX_CHOICES = 20;
@@ -28,7 +28,6 @@ export class ScanService {
   async resolve(policy: Policy, raw: string): Promise<ScanResult> {
     const code = parseScanCode(raw);
     if (code.kind === 'empty') return NONE;
-    if (code.kind === 'qr') return this.byToken(policy, code.type, code.token);
 
     const value = code.value;
     if (looksLikeSerial(value) && can(policy, 'inventory.item.view')) {
@@ -71,27 +70,9 @@ export class ScanService {
     return this.byPartNo(policy, value);
   }
 
-  async byToken(
-    policy: Policy,
-    type: QrKind,
-    token: string,
-  ): Promise<ScanResult> {
-    const row =
-      type === 'item'
-        ? await this.prisma.item.findUnique({
-            where: { qrToken: token },
-            select: { id: true },
-          })
-        : await this.prisma.bin.findUnique({
-            where: { qrToken: token },
-            select: { id: true },
-          });
-    return row ? this.allowed(policy, type, row.id) : NONE;
-  }
-
   private async findToken(
     token: string,
-  ): Promise<{ type: QrKind; id: string } | null> {
+  ): Promise<{ type: LabelKind; id: string } | null> {
     const item = await this.prisma.item.findUnique({
       where: { qrToken: token },
       select: { id: true },
@@ -101,7 +82,27 @@ export class ScanService {
       where: { qrToken: token },
       select: { id: true },
     });
-    return bin ? { type: 'bin', id: bin.id } : null;
+    if (bin) return { type: 'bin', id: bin.id };
+    // A hand-held scanner with Caps Lock on flips the letter case.
+    const anyCase = {
+      qrToken: { equals: token, mode: 'insensitive' as const },
+    };
+    const [items, bins] = await Promise.all([
+      this.prisma.item.findMany({
+        where: anyCase,
+        select: { id: true },
+        take: 2,
+      }),
+      this.prisma.bin.findMany({
+        where: anyCase,
+        select: { id: true },
+        take: 2,
+      }),
+    ]);
+    if (items.length + bins.length !== 1) return null;
+    return items[0]
+      ? { type: 'item', id: items[0].id }
+      : { type: 'bin', id: (bins[0] as { id: string }).id };
   }
 
   private async byPartNo(policy: Policy, value: string): Promise<ScanResult> {
@@ -134,7 +135,7 @@ export class ScanService {
     };
   }
 
-  private allowed(policy: Policy, type: QrKind, id: string): ScanResult {
+  private allowed(policy: Policy, type: LabelKind, id: string): ScanResult {
     if (type === 'item') {
       return can(policy, 'inventory.item.view')
         ? { type, id, path: itemPath(id) }

@@ -306,9 +306,11 @@ function BulkButton({ rows }: { rows: PutawayRow[] }) {
 export function PutawayBoard({
   groups,
   canAct,
+  canPrintSerials,
 }: {
   groups: PutawayGroup[];
   canAct: boolean;
+  canPrintSerials: boolean;
 }) {
   const [open, setOpen] = useState<PutawayRow | null>(null);
   const phone = useMediaQuery('(max-width: 48em)');
@@ -365,12 +367,14 @@ export function PutawayBoard({
                     <Pill>No usual bin</Pill>
                   )}
                   <Group gap="xs">
-                    <SerialLabelsButton
-                      scope={{ grnId: row.grn.id, grnLineId: row.grnLineId }}
-                      label="Print labels"
-                      unprintedOnly
-                      size="md"
-                    />
+                    {canPrintSerials ? (
+                      <SerialLabelsButton
+                        scope={{ grnId: row.grn.id, grnLineId: row.grnLineId }}
+                        label="Print labels"
+                        unprintedOnly
+                        size="md"
+                      />
+                    ) : null}
                     {canAct ? (
                       <Button size="md" onClick={() => setOpen(row)}>
                         Put away

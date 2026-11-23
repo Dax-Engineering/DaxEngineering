@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -16,6 +15,7 @@ import {
   PageHead,
   Pager,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { ListFilters } from '../../../../../components/list-filters';
 import { formatCount, formatDateTime } from '../../../../../lib/format';
@@ -43,7 +43,6 @@ export default async function AodListPage({
     <>
       <PageHead
         back={{ href: BASE, label: 'Issuing' }}
-        eyebrow="Issuing"
         title="AODs"
         lede="An AOD is complete only when its signed copy is uploaded."
       />
@@ -85,7 +84,7 @@ export default async function AodListPage({
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>AOD</TableTh>
@@ -120,7 +119,7 @@ export default async function AodListPage({
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {page.items.map((a) => (

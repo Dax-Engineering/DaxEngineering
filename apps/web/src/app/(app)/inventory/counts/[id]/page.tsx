@@ -1,7 +1,6 @@
 import {
   Alert,
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -18,6 +17,7 @@ import {
   PageHead,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { ConfirmAction } from '../../../../../components/confirm-action';
 import { formatDateTime, formatQty } from '../../../../../lib/format';
@@ -65,7 +65,7 @@ function Review({ count }: { count: CountDto }) {
   return (
     <>
       <Box visibleFrom="md">
-        <Table>
+        <ScrollTable>
           <TableThead>
             <TableTr>
               <TableTh>Bin</TableTh>
@@ -128,7 +128,7 @@ function Review({ count }: { count: CountDto }) {
               ),
             )}
           </TableTbody>
-        </Table>
+        </ScrollTable>
       </Box>
       <Box hiddenFrom="md" className="dax-rows">
         {count.bins.map((bin) => (
@@ -228,6 +228,7 @@ export default async function CountPage({
                   version: count.version,
                   step: 'approve',
                 }}
+                primary
                 label="Approve and post"
                 title="Approve this count?"
                 message="Each difference is posted to stock now and the bins are free again. This can't be undone."

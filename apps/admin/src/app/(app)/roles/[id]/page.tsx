@@ -35,7 +35,6 @@ export default async function RolePage({
   return (
     <>
       <PageHead
-        eyebrow="Admin · Access"
         back={{ href: '/roles', label: 'Roles' }}
         title={role.name}
         lede={

@@ -1,16 +1,24 @@
-import { Empty, PageHead } from '@dax/web-shell';
-import { LinkButton } from '../../components/links';
+import { Button } from '@mantine/core';
+import { Icon, StatusPage } from '@dax/web-shell';
 
 export default function NotFound() {
   return (
-    <>
-      <PageHead eyebrow="Not found" title="Nothing here" />
-      <Empty title="This record doesn't exist, or you don't have access to it." />
-      <div>
-        <LinkButton href="/" variant="default">
+    <StatusPage
+      scene="not-found"
+      title="Nothing here"
+      actions={
+        <Button
+          size="md"
+          component="a"
+          href="/"
+          variant="default"
+          leftSection={<Icon name="home" size={18} />}
+        >
           Go home
-        </LinkButton>
-      </div>
-    </>
+        </Button>
+      }
+    >
+      This record doesn't exist, or you don't have access to it.
+    </StatusPage>
   );
 }

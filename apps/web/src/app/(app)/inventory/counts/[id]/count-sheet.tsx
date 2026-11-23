@@ -380,6 +380,7 @@ export function CountSheet({
                   version: count.version,
                   step: 'submit',
                 }}
+                primary
                 label="Submit count"
                 title="Submit this count?"
                 message="The Stores Manager reviews the differences and posts them. You can't change the counts unless it is sent back."

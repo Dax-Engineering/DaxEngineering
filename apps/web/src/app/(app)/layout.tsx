@@ -1,8 +1,10 @@
+import { cookies } from 'next/headers';
 import Link from 'next/link';
 import {
   CapabilityProvider,
   canDo,
   DaxShell,
+  RAIL_COOKIE,
   Icon,
   type ShellNavItem,
 } from '@dax/web-shell';
@@ -137,6 +139,7 @@ export default async function AppLayout({
   return (
     <CapabilityProvider value={caps}>
       <DaxShell
+        railOpen={(await cookies()).get(RAIL_COOKIE)?.value === 'open'}
         appLabel="Stores"
         userName={me.user.name}
         userNote={me.user.isSuperAdmin ? 'Super admin' : 'Stores'}
@@ -150,7 +153,7 @@ export default async function AppLayout({
             {canScan ? (
               <ScanMenu
                 here={canScan}
-                phone={canDo(caps, 'inventory.item.view')}
+                phone={canDo(caps, 'inventory.phone_scan.use')}
               />
             ) : null}
           </>

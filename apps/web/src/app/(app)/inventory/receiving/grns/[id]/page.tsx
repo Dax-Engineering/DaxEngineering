@@ -1,7 +1,6 @@
 import {
   Alert,
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -19,6 +18,7 @@ import {
   PageHead,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { LinkButton } from '../../../../../../components/links';
 import { SerialLabelsButton } from '../../../../../../components/serial-labels';
@@ -145,7 +145,7 @@ function PostedLines({ grn, canPrint }: { grn: GrnDto; canPrint: boolean }) {
   return (
     <>
       <Box visibleFrom="md">
-        <Table>
+        <ScrollTable>
           <TableThead>
             <TableTr>
               <TableTh>Part</TableTh>
@@ -191,7 +191,7 @@ function PostedLines({ grn, canPrint }: { grn: GrnDto; canPrint: boolean }) {
               </TableTr>
             ))}
           </TableTbody>
-        </Table>
+        </ScrollTable>
       </Box>
       <Box hiddenFrom="md" className="dax-rows">
         {grn.lines.map((line) => (
@@ -241,10 +241,7 @@ export default async function GrnPage({
   const posted = grn.status === 'POSTED' || grn.status === 'PUT_AWAY';
   const waiting = grn.lines.filter((l) => qtyNumber(l.toPutAway) > 0).length;
   const title = grn.number ? <Mono>{grn.number}</Mono> : 'Draft GRN';
-  const canPrint =
-    can('inventory.grn.post') ||
-    can('inventory.grn.putaway') ||
-    can('inventory.item.print_label');
+  const canPrint = can('inventory.serial.print_label');
   const serialCount = grn.lines.reduce((n, l) => n + l.serials.length, 0);
   const unprinted = grn.lines.reduce(
     (n, l) =>

@@ -1,13 +1,19 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
   TableThead,
   TableTr,
 } from '@mantine/core';
-import { canDo, CardBody, Empty, PageHead, SectionCard } from '@dax/web-shell';
+import {
+  canDo,
+  CardBody,
+  Empty,
+  PageHead,
+  SectionCard,
+  ScrollTable,
+} from '@dax/web-shell';
 import { LinkButton } from '../../../../../components/links';
 import { formatQty } from '../../../../../lib/format';
 import { requirePermission } from '../../../../../lib/server';
@@ -26,7 +32,6 @@ export default async function BelowMinimumPage() {
   return (
     <>
       <PageHead
-        eyebrow="Reports"
         title="Below minimum"
         back={{ href: BASE, label: 'Reports' }}
         lede="Active parts whose free stock is under the minimum, most short first. Waiting is what open MRNs still need beyond what is already set aside for them."
@@ -58,7 +63,7 @@ export default async function BelowMinimumPage() {
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>Part number</TableTh>
@@ -103,7 +108,7 @@ export default async function BelowMinimumPage() {
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {report.items.map((row) => (

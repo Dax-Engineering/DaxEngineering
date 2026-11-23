@@ -338,8 +338,8 @@ export function UseList({
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
-            QR labels for {targetText}, one per part. Choose copies and where to
-            start on the sheet next.
+            Barcode labels for {targetText}, one per part. Choose copies and
+            where to start on the sheet next.
           </Text>
           {targetItems.length ? (
             <PrintLabelsButton

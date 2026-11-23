@@ -10,7 +10,7 @@ import {
 
 const item: LabelContent = {
   kind: 'item',
-  url: 'https://stores.example.com/q/i/AbC123xyZ789',
+  token: 'AbC123xyZ789',
   partNo: '1R-0750',
   brand: 'Caterpillar',
   description:
@@ -19,7 +19,7 @@ const item: LabelContent = {
 };
 const bin: LabelContent = {
   kind: 'bin',
-  url: 'https://stores.example.com/q/b/ZyX987cbA321',
+  token: 'ZyX987cbA321',
   code: 'X-00-00-RCV',
   zone: 'Special areas',
   binKind: 'RECEIVING',

@@ -9,7 +9,6 @@ export default async function ImportItemsPage() {
     <>
       <PageHead
         back={{ href: '/inventory/items', label: 'Items' }}
-        eyebrow="Inventory"
         title="Import items"
         lede="Add or update many items at once from a CSV file."
       />

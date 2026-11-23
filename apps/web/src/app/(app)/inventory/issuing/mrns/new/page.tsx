@@ -14,7 +14,6 @@ export default async function NewMrnPage() {
     <>
       <PageHead
         back={{ href: `${BASE}/mrns`, label: 'MRNs' }}
-        eyebrow="Issuing"
         title="Raise MRN"
         lede="List the parts a job needs. Stores checks it, reserves what is free and the rest waits for stock."
       />

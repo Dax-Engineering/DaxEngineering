@@ -5,7 +5,6 @@ import {
   Box,
   Button,
   Group,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -15,7 +14,7 @@ import {
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import type { MovementRow } from '@dax/inventory-contract';
-import { Empty, Mono } from '@dax/web-shell';
+import { Empty, Mono, ScrollTable } from '@dax/web-shell';
 import { formatDateTime, formatQty } from '../../../../../lib/format';
 import { loadMovements } from '../../receiving/_lib/actions';
 import { documentPath, MOVEMENT_LABELS } from '../../receiving/_lib/labels';
@@ -87,7 +86,7 @@ export function Movements({
   return (
     <>
       <Box visibleFrom="md">
-        <Table>
+        <ScrollTable>
           <TableThead>
             <TableTr>
               <TableTh>When</TableTh>
@@ -121,7 +120,7 @@ export function Movements({
               </TableTr>
             ))}
           </TableTbody>
-        </Table>
+        </ScrollTable>
       </Box>
       <Box hiddenFrom="md" className="dax-rows">
         {rows.map((row) => (

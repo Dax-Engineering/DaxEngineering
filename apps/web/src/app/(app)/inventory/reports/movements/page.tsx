@@ -1,7 +1,6 @@
 import {
   Box,
   Group,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -21,6 +20,7 @@ import {
   PageHead,
   Pager,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import {
   formatCount,
@@ -70,7 +70,6 @@ export default async function MovementsReportPage({
   return (
     <>
       <PageHead
-        eyebrow="Reports"
         title="Stock movements"
         back={{ href: BASE, label: 'Reports' }}
         lede="Newest first. Dates are Sri Lanka time. The export holds up to 50,000 rows; narrow the dates for more."
@@ -110,7 +109,7 @@ export default async function MovementsReportPage({
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>When</TableTh>
@@ -150,7 +149,7 @@ export default async function MovementsReportPage({
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {page.items.map((row) => (

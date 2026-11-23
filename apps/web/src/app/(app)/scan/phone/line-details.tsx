@@ -4,7 +4,6 @@ import {
   Alert,
   Anchor,
   Button,
-  Checkbox,
   Drawer,
   Group,
   Loader,
@@ -15,7 +14,6 @@ import {
   TextInput,
 } from '@mantine/core';
 import {
-  normalizePartNo,
   type ItemDetail,
   type PhoneScanLineDto,
   type PhoneScanSuggestion,
@@ -107,7 +105,6 @@ function KnownPart({
   sessionId: string;
   act: Act;
 }) {
-  const canEdit = useCan('inventory.item.edit');
   const canPrint = useCan('inventory.item.print_label');
   const [item, setItem] = useState<ItemDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -124,10 +121,6 @@ function KnownPart({
     };
   }, [line.item.id, line.qty]);
 
-  const known =
-    item?.barcodes.some((b) => b.code === line.code) ||
-    normalizePartNo(line.code) === normalizePartNo(line.item.partNo) ||
-    line.code.includes('/q/');
   const s = item?.stock;
   const free = s
     ? Number(s.onHand) -
@@ -197,16 +190,6 @@ function KnownPart({
       </div>
 
       <Group gap="sm">
-        {item && !known && canEdit ? (
-          <Button
-            variant="light"
-            onClick={() =>
-              void act(() => linkLine(sessionId, line.id, line.item.id, true))
-            }
-          >
-            Save <Mono>&nbsp;{line.code}&nbsp;</Mono> as its barcode
-          </Button>
-        ) : null}
         {canPrint ? (
           <PrintLabelsButton
             kind="item"
@@ -238,7 +221,6 @@ function NewPart({
   act: Act;
 }) {
   const canCreate = useCan('inventory.item.create');
-  const canEdit = useCan('inventory.item.edit');
   const [suggestion, setSuggestion] = useState<PhoneScanSuggestion | null>(
     null,
   );
@@ -252,7 +234,6 @@ function NewPart({
     minQty: '0',
   });
   const [pick, setPick] = useState<string | null>(null);
-  const [keepCode, setKeepCode] = useState(canEdit);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -420,9 +401,6 @@ function NewPart({
                     }
                   />
                 </Group>
-                <Text size="xs" c="dimmed">
-                  The scanned code is saved as the item&apos;s barcode.
-                </Text>
                 <Button type="submit" loading={saving}>
                   Add item
                 </Button>
@@ -437,18 +415,12 @@ function NewPart({
                 value={pick}
                 onChange={setPick}
               />
-              <Checkbox
-                label="Keep this code as the item's barcode"
-                checked={keepCode}
-                disabled={!canEdit}
-                onChange={(e) => setKeepCode(e.currentTarget.checked)}
-              />
               <Button
                 disabled={!pick}
                 loading={saving}
                 onClick={() =>
                   pick &&
-                  void run(() => linkLine(sessionId, line.id, pick, keepCode))
+                  void run(() => linkLine(sessionId, line.id, pick, false))
                 }
               >
                 Link

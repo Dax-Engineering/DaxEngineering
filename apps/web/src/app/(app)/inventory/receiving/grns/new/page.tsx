@@ -9,7 +9,6 @@ export default async function ReceiveDeliveryPage() {
     <>
       <PageHead
         back={{ href: BASE, label: 'Receiving' }}
-        eyebrow="Receiving"
         title="Raise GRN"
         lede="Start a draft GRN, then count each part at the dock."
       />

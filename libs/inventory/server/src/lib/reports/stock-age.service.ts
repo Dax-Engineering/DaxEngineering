@@ -162,7 +162,7 @@ export class StockAgeService {
       r.atLeast ? 'Includes opening stock' : null,
     ]);
     return {
-      name: `stock-age-${colomboDay(new Date())}.csv`,
+      name: `age-analysis-${colomboDay(new Date())}.csv`,
       text: toCsv(
         [
           'Part number',

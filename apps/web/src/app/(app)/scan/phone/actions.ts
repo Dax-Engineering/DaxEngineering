@@ -133,7 +133,7 @@ export interface NewItemFromLine {
   minQty: string;
 }
 
-/** Creates the item, then keeps the scanned code on it as a barcode. */
+/** Creates the item, then links the scanned line to it. */
 export async function createItemForLine(
   id: string,
   lineId: string,
@@ -155,5 +155,5 @@ export async function createItemForLine(
     json: parsed.data,
   });
   if (!created.ok) return created;
-  return linkLine(id, lineId, created.data.id, true);
+  return linkLine(id, lineId, created.data.id, false);
 }

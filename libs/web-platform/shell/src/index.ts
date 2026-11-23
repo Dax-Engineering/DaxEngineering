@@ -15,3 +15,7 @@ export * from './lib/logo';
 export * from './lib/pager';
 export * from './lib/scan-feedback';
 export * from './lib/qr-box';
+export * from './lib/status-page';
+export * from './lib/day-input';
+export * from './lib/rail';
+export * from './lib/scroll-table';

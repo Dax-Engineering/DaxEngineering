@@ -1,6 +1,7 @@
 'use client';
 
-import { Button, Loader, Select, TextInput } from '@mantine/core';
+import { Button, Loader, Select } from '@mantine/core';
+import { DayInput } from '@dax/web-shell';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 import {
@@ -59,20 +60,18 @@ export function MovementFilters({
 
   return (
     <div className="dax-filters" role="search">
-      <TextInput
-        type="date"
+      <DayInput
         label="From"
         value={params.get('from') ?? ''}
         max={params.get('to') ?? undefined}
-        onChange={(e) => go({ from: e.currentTarget.value || null })}
+        onChange={(v) => go({ from: v || null })}
         style={{ flex: '1 1 150px', maxWidth: 180 }}
       />
-      <TextInput
-        type="date"
+      <DayInput
         label="To"
         value={params.get('to') ?? ''}
         min={params.get('from') ?? undefined}
-        onChange={(e) => go({ to: e.currentTarget.value || null })}
+        onChange={(v) => go({ to: v || null })}
         style={{ flex: '1 1 150px', maxWidth: 180 }}
       />
       <ItemPicker

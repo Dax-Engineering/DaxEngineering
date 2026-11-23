@@ -9,7 +9,7 @@ import {
   Table,
   Text,
 } from '@mantine/core';
-import { Empty, Pill, SectionCard } from '@dax/web-shell';
+import { Empty, Pill, SectionCard, ScrollTable } from '@dax/web-shell';
 import type { Dispatch, SetStateAction } from 'react';
 import {
   type CatalogEntity,
@@ -200,7 +200,7 @@ export function FieldGrid({
                       </Group>
                     )}
                     <Table.ScrollContainer minWidth={640}>
-                      <Table verticalSpacing="xs">
+                      <ScrollTable verticalSpacing="xs">
                         <Table.Thead>
                           <Table.Tr>
                             <Table.Th>Field</Table.Th>
@@ -222,7 +222,7 @@ export function FieldGrid({
                             />
                           ))}
                         </Table.Tbody>
-                      </Table>
+                      </ScrollTable>
                     </Table.ScrollContainer>
                   </Stack>
                 </Accordion.Panel>

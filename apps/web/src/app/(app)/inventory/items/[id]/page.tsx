@@ -1,6 +1,5 @@
 import {
   Alert,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -14,12 +13,14 @@ import {
   Facts,
   Mono,
   PageHead,
+  PageTabs,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { ConfirmAction } from '../../../../../components/confirm-action';
 import { PrintLabelsButton } from '../../../../../components/labels';
-import { AppLink } from '../../../../../components/links';
+import { AppLink, LinkButton } from '../../../../../components/links';
 import { BelowMinBadge, StockPanel } from '../../../../../components/stock';
 import { names, TagChips } from '../../../../../components/item-extras';
 import {
@@ -29,6 +30,7 @@ import {
   uomLabel,
 } from '../../../../../lib/format';
 import { optional, uuidParam } from '../../../../../lib/load';
+import { flatten, type SearchParams } from '../../../../../lib/query';
 import { requirePermission } from '../../../../../lib/server';
 import {
   getCatalog,
@@ -38,47 +40,57 @@ import {
 } from '../../_lib/data';
 import { listMovements } from '../../receiving/_lib/data';
 import { setItemStatus } from '../_item/actions';
-import { Barcodes } from '../_item/barcodes';
 import { ItemForm } from '../_item/item-form';
 import { Movements } from '../_item/movements';
 import { Replacement } from '../_item/replacement';
 import { SerialsCard } from '../_item/serials';
 import { StockAgeCard } from '../_item/stock-age';
 
+type Tab = 'overview' | 'serials' | 'age' | 'movements';
+
 export default async function ItemPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: SearchParams;
 }) {
   const caps = await requirePermission('inventory.item.view');
   const id = await uuidParam(params);
+  const query = flatten(await searchParams);
+  const canMovements = canDo(caps, 'inventory.ledger.view');
+  const canAge = canDo(caps, 'inventory.stock.view');
+  const tabs: { key: Tab; label: string }[] = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'serials', label: 'Serial numbers' },
+    ...(canAge ? [{ key: 'age' as const, label: 'Age analysis' }] : []),
+    ...(canMovements
+      ? [{ key: 'movements' as const, label: 'Movements' }]
+      : []),
+  ];
+  const tab: Tab = tabs.find((t) => t.key === query['tab'])?.key ?? 'overview';
   const [item, movements, age, serials] = await Promise.all([
     getItem(id),
-    canDo(caps, 'inventory.ledger.view') ? optional(listMovements(id)) : null,
-    canDo(caps, 'inventory.stock.view') ? optional(getItemAge(id)) : null,
-    optional(getItemSerials(id)),
+    tab === 'movements' ? optional(listMovements(id)) : null,
+    tab === 'age' ? optional(getItemAge(id)) : null,
+    tab === 'serials' ? optional(getItemSerials(id)) : null,
   ]);
-  const canPrintSerials =
-    canDo(caps, 'inventory.item.print_label') ||
-    canDo(caps, 'inventory.grn.post') ||
-    canDo(caps, 'inventory.grn.putaway');
+  const here = `/inventory/items/${id}`;
+  const tabHref = (t: Tab) => (t === 'overview' ? here : `${here}?tab=${t}`);
+  const canPrintSerials = canDo(caps, 'inventory.serial.print_label');
   const active = item.status === 'ACTIVE';
   const canEdit = canDo(caps, 'inventory.item.edit') && active;
   const canArchive = canDo(caps, 'inventory.item.archive');
   const canPrint = canDo(caps, 'inventory.item.print_label');
-  const catalog = canEdit ? await getCatalog() : null;
+  const editing = canEdit && tab === 'overview' && query['edit'] === '1';
+  const catalog = editing ? await getCatalog() : null;
   const replacement = item.latestReplacement ?? item.supersededBy;
 
   return (
     <>
       <PageHead
         back={{ href: '/inventory/items', label: 'Items' }}
-        eyebrow={
-          <>
-            {item.brand.name} · Added {formatDateTime(item.createdAt)} · Updated{' '}
-            {formatDateTime(item.updatedAt)}
-          </>
-        }
+        eyebrow={item.brand.name}
         title={<Mono>{item.partNo}</Mono>}
         lede={item.description}
         actions={
@@ -137,7 +149,7 @@ export default async function ItemPage({
             belowMin={item.belowMin}
           />
           {item.stockByBin.length ? (
-            <Table>
+            <ScrollTable>
               <TableThead>
                 <TableTr>
                   <TableTh>Bin</TableTh>
@@ -161,71 +173,213 @@ export default async function ItemPage({
                   </TableTr>
                 ))}
               </TableTbody>
-            </Table>
+            </ScrollTable>
           ) : (
             <Empty title="Not in any bin yet" />
           )}
         </div>
       </SectionCard>
 
-      {item.family.members.length > 1 ? (
-        <SectionCard
-          flush
-          title="Part family"
-          note="Superseded numbers share their stock: MRNs reserve the oldest number first"
-        >
-          <Table>
-            <TableThead>
-              <TableTr>
-                <TableTh>Part number</TableTh>
-                <TableTh />
-                <TableTh ta="right">On hand</TableTh>
-                <TableTh ta="right">Free</TableTh>
-              </TableTr>
-            </TableThead>
-            <TableTbody>
-              {item.family.members.map((m) => (
-                <TableTr key={m.id}>
-                  <TableTd>
-                    {m.id === item.id ? (
-                      <b>
-                        <Mono>{m.partNo}</Mono>
-                      </b>
-                    ) : (
+      <PageTabs
+        label="Part sections"
+        items={tabs.map((t) => ({
+          href: tabHref(t.key),
+          label: t.label,
+          active: t.key === tab,
+        }))}
+      />
+
+      {tab === 'overview' ? (
+        <>
+          <SectionCard
+            title="Details"
+            actions={
+              canEdit && !editing ? (
+                <LinkButton href={`${here}?edit=1`} variant="default" size="sm">
+                  Edit
+                </LinkButton>
+              ) : null
+            }
+          >
+            {editing && catalog ? (
+              <ItemForm
+                key={item.version}
+                catalog={catalog}
+                item={item}
+                cancelHref={here}
+              />
+            ) : (
+              <Facts
+                items={[
+                  { label: 'Brand', value: item.brand.name },
+                  {
+                    label: 'Unit',
+                    value: `${uomLabel(item.uom)} (${item.uom})`,
+                  },
+                  { label: 'Minimum stock', value: formatQty(item.minQty) },
+                  {
+                    label: 'Usual bin',
+                    value: item.defaultBin ? (
                       <Link
-                        href={`/inventory/items/${m.id}`}
+                        href={`/inventory/locations/bins/${item.defaultBin.id}`}
                         className="dax-link"
                       >
-                        <Mono>{m.partNo}</Mono>
+                        <Mono>{item.defaultBin.code}</Mono>
                       </Link>
-                    )}
-                  </TableTd>
-                  <TableTd>
-                    {m.current ? (
-                      <Pill tone="ok">Current</Pill>
                     ) : (
-                      <Pill>Superseded</Pill>
-                    )}
-                  </TableTd>
-                  <TableTd className="dax-num">{formatQty(m.onHand)}</TableTd>
-                  <TableTd className="dax-num">{formatQty(m.free)}</TableTd>
-                </TableTr>
-              ))}
-              <TableTr>
-                <TableTd>
-                  <b>Family total</b>
-                </TableTd>
-                <TableTd />
-                <TableTd className="dax-num">
-                  <b>{formatQty(item.family.stock.onHand)}</b>
-                </TableTd>
-                <TableTd className="dax-num">
-                  <b>{formatQty(item.family.stock.free)}</b>
-                </TableTd>
-              </TableTr>
-            </TableTbody>
-          </Table>
-        </SectionCard>
+                      '—'
+                    ),
+                  },
+                  {
+                    label: 'Fits machine models',
+                    value:
+                      item.machineModels.map((m) => m.name).join(', ') || '—',
+                  },
+                  { label: 'Machine types', value: names(item.machineTypes) },
+                  { label: 'Main supplier', value: item.supplier?.name ?? '—' },
+                  {
+                    label: 'Pre-costing price',
+                    value: formatMoney(item.preCostPrice),
+                  },
+                  {
+                    label: 'Selling price',
+                    value: formatMoney(item.sellingPrice),
+                  },
+                  {
+                    label: 'Tags',
+                    value: item.tags.length ? (
+                      <TagChips tags={item.tags} />
+                    ) : (
+                      '—'
+                    ),
+                  },
+                  { label: 'Added', value: formatDateTime(item.createdAt) },
+                  {
+                    label: 'Last changed',
+                    value: formatDateTime(item.updatedAt),
+                  },
+                  {
+                    label: 'Notes',
+                    value: (
+                      <span style={{ whiteSpace: 'pre-wrap' }}>
+                        {item.notes ?? '—'}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            )}
+          </SectionCard>
+
+          <SectionCard title="Supersession">
+            <Replacement
+              item={item}
+              canEdit={active && canDo(caps, 'inventory.item.supersede')}
+            />
+          </SectionCard>
+
+          {item.family.members.length > 1 ? (
+            <SectionCard
+              flush
+              title="Part family"
+              note="Superseded numbers share their stock: MRNs reserve the oldest number first"
+            >
+              <ScrollTable>
+                <TableThead>
+                  <TableTr>
+                    <TableTh>Part number</TableTh>
+                    <TableTh />
+                    <TableTh ta="right">On hand</TableTh>
+                    <TableTh ta="right">Free</TableTh>
+                  </TableTr>
+                </TableThead>
+                <TableTbody>
+                  {item.family.members.map((m) => (
+                    <TableTr key={m.id}>
+                      <TableTd>
+                        {m.id === item.id ? (
+                          <b>
+                            <Mono>{m.partNo}</Mono>
+                          </b>
+                        ) : (
+                          <Link
+                            href={`/inventory/items/${m.id}`}
+                            className="dax-link"
+                          >
+                            <Mono>{m.partNo}</Mono>
+                          </Link>
+                        )}
+                      </TableTd>
+                      <TableTd>
+                        {m.current ? (
+                          <Pill tone="ok">Current</Pill>
+                        ) : (
+                          <Pill>Superseded</Pill>
+                        )}
+                      </TableTd>
+                      <TableTd className="dax-num">
+                        {formatQty(m.onHand)}
+                      </TableTd>
+                      <TableTd className="dax-num">{formatQty(m.free)}</TableTd>
+                    </TableTr>
+                  ))}
+                  <TableTr>
+                    <TableTd>
+                      <b>Family total</b>
+                    </TableTd>
+                    <TableTd />
+                    <TableTd className="dax-num">
+                      <b>{formatQty(item.family.stock.onHand)}</b>
+                    </TableTd>
+                    <TableTd className="dax-num">
+                      <b>{formatQty(item.family.stock.free)}</b>
+                    </TableTd>
+                  </TableTr>
+                </TableTbody>
+              </ScrollTable>
+            </SectionCard>
+          ) : null}
+
+          {item.customerParts.length ? (
+            <SectionCard
+              flush
+              title="Customer part numbers"
+              note="Generated the first time the part goes on a customer's AOD"
+            >
+              <ScrollTable>
+                <TableThead>
+                  <TableTr>
+                    <TableTh>Customer</TableTh>
+                    <TableTh>Customer part no.</TableTh>
+                    <TableTh>AODs</TableTh>
+                  </TableTr>
+                </TableThead>
+                <TableTbody>
+                  {item.customerParts.map((c) => (
+                    <TableTr key={c.partNo}>
+                      <TableTd>{c.customerName}</TableTd>
+                      <TableTd>
+                        <Mono>{c.partNo}</Mono>
+                      </TableTd>
+                      <TableTd>
+                        {canDo(caps, 'inventory.aod.view') ? (
+                          <Link
+                            className="dax-link"
+                            href={`/inventory/issuing/aods?status=ALL&q=${encodeURIComponent(c.partNo)}`}
+                          >
+                            AODs with this part
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </TableTd>
+                    </TableTr>
+                  ))}
+                </TableTbody>
+              </ScrollTable>
+            </SectionCard>
+          ) : null}
+        </>
       ) : null}
 
       {serials ? (
@@ -247,7 +401,7 @@ export default async function ItemPage({
       {age ? (
         <SectionCard
           flush
-          title="Stock age"
+          title="Age analysis"
           note="Oldest first. Units that left took the oldest stock"
         >
           <StockAgeCard age={age} uom={item.uom} />
@@ -261,111 +415,6 @@ export default async function ItemPage({
           note="Every change to this part's stock, newest first"
         >
           <Movements itemId={item.id} uom={item.uom} initial={movements} />
-        </SectionCard>
-      ) : null}
-
-      <SectionCard title="Details">
-        {canEdit && catalog ? (
-          <ItemForm key={item.version} catalog={catalog} item={item} />
-        ) : (
-          <Facts
-            items={[
-              { label: 'Brand', value: item.brand.name },
-              {
-                label: 'Unit',
-                value: `${uomLabel(item.uom)} (${item.uom})`,
-              },
-              { label: 'Minimum stock', value: formatQty(item.minQty) },
-              {
-                label: 'Usual bin',
-                value: item.defaultBin ? (
-                  <Link
-                    href={`/inventory/locations/bins/${item.defaultBin.id}`}
-                    className="dax-link"
-                  >
-                    <Mono>{item.defaultBin.code}</Mono>
-                  </Link>
-                ) : (
-                  '—'
-                ),
-              },
-              {
-                label: 'Fits machine models',
-                value: item.machineModels.map((m) => m.name).join(', ') || '—',
-              },
-              { label: 'Machine types', value: names(item.machineTypes) },
-              { label: 'Main supplier', value: item.supplier?.name ?? '—' },
-              {
-                label: 'Pre-costing price',
-                value: formatMoney(item.preCostPrice),
-              },
-              { label: 'Selling price', value: formatMoney(item.sellingPrice) },
-              {
-                label: 'Tags',
-                value: item.tags.length ? <TagChips tags={item.tags} /> : '—',
-              },
-              {
-                label: 'Notes',
-                value: (
-                  <span style={{ whiteSpace: 'pre-wrap' }}>
-                    {item.notes ?? '—'}
-                  </span>
-                ),
-              },
-            ]}
-          />
-        )}
-      </SectionCard>
-
-      <div className="dax-grid2">
-        <SectionCard
-          title="Barcodes"
-          note="A scan of any of these finds the item"
-        >
-          <Barcodes item={item} canEdit={canEdit} />
-        </SectionCard>
-        <SectionCard title="Supersession">
-          <Replacement item={item} canEdit={canEdit} />
-        </SectionCard>
-      </div>
-
-      {item.customerParts.length ? (
-        <SectionCard
-          flush
-          title="Customer part numbers"
-          note="Generated the first time the part goes on a customer's AOD"
-        >
-          <Table>
-            <TableThead>
-              <TableTr>
-                <TableTh>Customer</TableTh>
-                <TableTh>Customer part no.</TableTh>
-                <TableTh>AODs</TableTh>
-              </TableTr>
-            </TableThead>
-            <TableTbody>
-              {item.customerParts.map((c) => (
-                <TableTr key={c.partNo}>
-                  <TableTd>{c.customerName}</TableTd>
-                  <TableTd>
-                    <Mono>{c.partNo}</Mono>
-                  </TableTd>
-                  <TableTd>
-                    {canDo(caps, 'inventory.aod.view') ? (
-                      <Link
-                        className="dax-link"
-                        href={`/inventory/issuing/aods?status=ALL&q=${encodeURIComponent(c.partNo)}`}
-                      >
-                        AODs with this part
-                      </Link>
-                    ) : (
-                      '—'
-                    )}
-                  </TableTd>
-                </TableTr>
-              ))}
-            </TableTbody>
-          </Table>
         </SectionCard>
       ) : null}
     </>

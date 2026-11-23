@@ -18,7 +18,7 @@ export default async function ScanPage({
     'inventory.item.view',
     'inventory.location.view',
   );
-  const canPhone = canDo(caps, 'inventory.item.view');
+  const canPhone = canDo(caps, 'inventory.phone_scan.use');
   const { qr } = flatten(await searchParams);
   return (
     <>

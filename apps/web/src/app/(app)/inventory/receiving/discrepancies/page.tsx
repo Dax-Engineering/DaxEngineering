@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -15,6 +14,7 @@ import {
   PageHead,
   Pager,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { ListFilters } from '../../../../../components/list-filters';
 import {
@@ -42,7 +42,6 @@ export default async function DiscrepanciesPage({
     <>
       <PageHead
         back={{ href: BASE, label: 'Receiving' }}
-        eyebrow="Receiving"
         title="Discrepancies"
         lede="Short, extra, damaged and wrong items found at the dock. Add notes and photos for the supplier claim, then close them."
       />
@@ -80,7 +79,7 @@ export default async function DiscrepanciesPage({
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>Kind</TableTh>
@@ -119,7 +118,7 @@ export default async function DiscrepanciesPage({
                     </TableTr>
                   ))}
                 </TableTbody>
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {page.items.map((d) => (

@@ -7,10 +7,9 @@ import {
   SimpleGrid,
   Stack,
   Text,
-  TextInput,
 } from '@mantine/core';
 import { startTransition, useActionState, useState } from 'react';
-import { SectionCard } from '@dax/web-shell';
+import { SectionCard, DayInput } from '@dax/web-shell';
 import { StateAlert } from '../../../../components/state-alert';
 import { type ActionState, IDLE } from '../../../../lib/action-state';
 import { type AccessPayload, saveAccess } from '../actions';
@@ -100,14 +99,13 @@ export function AccessForm({
                   }
                 />
                 {on ? (
-                  <TextInput
-                    type="date"
+                  <DayInput
                     size="xs"
                     aria-label={`${role.name} expires on`}
                     placeholder="No expiry"
                     value={selected.get(role.id) ?? ''}
                     disabled={disabled}
-                    onChange={(e) => setExpiry(role.id, e.currentTarget.value)}
+                    onChange={(v) => setExpiry(role.id, v)}
                     error={
                       state.fields?.[
                         `roles.${[...selected.keys()].indexOf(role.id)}.expiresOn`

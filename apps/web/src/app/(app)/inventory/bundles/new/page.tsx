@@ -8,7 +8,6 @@ export default async function NewBundlePage() {
     <>
       <PageHead
         back={{ href: '/inventory/bundles', label: 'Bundles' }}
-        eyebrow="Items"
         title="New bundle"
         lede="List the parts in one set. An MRN then asks for a number of sets."
       />

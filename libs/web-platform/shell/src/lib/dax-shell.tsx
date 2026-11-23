@@ -11,11 +11,12 @@ import {
 } from '@mantine/core';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { authClient } from './auth-client';
 import { Icon } from './icon';
 import { DaxLogo } from './logo';
 import { clearOfflineData } from './pwa';
+import { RAIL_COOKIE } from './rail';
 
 export interface ShellNavTab {
   key: string;
@@ -145,6 +146,7 @@ export function DaxShell({
   scan,
   mobileKeys = [],
   securityPath = '/account/security',
+  railOpen = false,
   children,
 }: {
   appLabel: string;
@@ -157,9 +159,17 @@ export function DaxShell({
   /** Screens that get a slot in the phone bottom bar, in order. */
   mobileKeys?: string[];
   securityPath?: string;
+  /** Side rail starts with names shown (read from RAIL_COOKIE on the server). */
+  railOpen?: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(railOpen);
+  const toggleRail = () => {
+    const next = !open;
+    setOpen(next);
+    document.cookie = `${RAIL_COOKIE}=${next ? 'open' : 'closed'}; path=/; max-age=31536000; samesite=lax`;
+  };
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const match = nav
     .flatMap((item) => (item.tabs ?? [item]).map((tab) => ({ item, tab })))
@@ -230,21 +240,38 @@ export function DaxShell({
           </Menu>
         </div>
       </header>
-      <div className="dax-shell">
+      <div className={open ? 'dax-shell rail-open' : 'dax-shell'}>
         <nav className="dax-rail" aria-label="Screens">
           {nav.map((item) => (
             <Link
               key={item.key}
               href={item.path}
-              aria-label={item.label}
+              aria-label={open ? undefined : item.label}
               aria-current={current?.key === item.key ? 'page' : undefined}
             >
               <Icon name={item.icon} />
-              <span className="tip" aria-hidden="true">
-                {item.label}
-              </span>
+              {open ? (
+                <span key="name" className="name">
+                  {item.label}
+                </span>
+              ) : (
+                <span key="tip" className="tip" aria-hidden="true">
+                  {item.label}
+                </span>
+              )}
             </Link>
           ))}
+          <button
+            type="button"
+            className="dax-rail-toggle"
+            onClick={toggleRail}
+            aria-expanded={open}
+            aria-label={open ? 'Hide screen names' : 'Show screen names'}
+            title={open ? 'Hide names' : 'Show names'}
+          >
+            <Icon name="chevron" size={18} />
+            {open ? <span className="name">Hide names</span> : null}
+          </button>
         </nav>
         <BottomBar
           nav={nav}

@@ -218,7 +218,7 @@ export function ShortCloseButton({ mrn }: { mrn: MrnDto }) {
   const { opened, setOpened, state, run, pending } = useDialog(shortCloseMrn);
   return (
     <>
-      <Button variant="default" color="red" onClick={() => setOpened(true)}>
+      <Button variant="light" color="red" onClick={() => setOpened(true)}>
         Short-close
       </Button>
       <Modal

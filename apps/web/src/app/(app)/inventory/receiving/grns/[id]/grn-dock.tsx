@@ -21,7 +21,7 @@ import {
   useState,
 } from 'react';
 import type { GrnDto } from '@dax/inventory-contract';
-import { Empty, Icon, Mono, Pill, SectionCard } from '@dax/web-shell';
+import { Empty, Icon, Mono, Pill, SectionCard, DayInput } from '@dax/web-shell';
 import { StateAlert } from '../../../../../../components/state-alert';
 import { fieldError, IDLE } from '../../../../../../lib/action-state';
 import { trimQty } from '../../../../../../lib/format';
@@ -302,12 +302,11 @@ export function GrnDock({ grn, canPost }: { grn: GrnDto; canPost: boolean }) {
               error={err('deliveryNote')}
               size="md"
             />
-            <TextInput
-              type="date"
+            <DayInput
               label="Date on the delivery note"
               description="For information. Stock is received on the day it is posted."
               value={deliveryDate}
-              onChange={(e) => setDeliveryDate(e.currentTarget.value)}
+              onChange={setDeliveryDate}
               error={err('deliveryDate')}
               size="md"
             />

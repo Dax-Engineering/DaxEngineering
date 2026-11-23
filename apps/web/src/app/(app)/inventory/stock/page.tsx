@@ -1,6 +1,5 @@
 import {
   Box,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -17,6 +16,7 @@ import {
   PageHead,
   Pager,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import {
   FamilyBar,
@@ -149,7 +149,7 @@ export default async function StockPage({
         ) : (
           <>
             <Box visibleFrom="md">
-              <Table>
+              <ScrollTable>
                 <TableThead>
                   <TableTr>
                     <TableTh>Part number</TableTh>
@@ -246,7 +246,7 @@ export default async function StockPage({
                       : null}
                   </TableTbody>
                 ))}
-              </Table>
+              </ScrollTable>
             </Box>
             <Box hiddenFrom="md" className="dax-rows">
               {page.items.map((row) => (

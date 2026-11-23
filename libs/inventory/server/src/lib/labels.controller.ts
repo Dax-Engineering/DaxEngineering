@@ -4,19 +4,16 @@ import {
   ForbiddenException,
   Header,
   HttpCode,
-  Inject,
   Post,
   Req,
   StreamableFile,
 } from '@nestjs/common';
-import { LabelRequest, qrUrl } from '@dax/inventory-contract';
+import { LabelRequest } from '@dax/inventory-contract';
 import {
   Authenticated,
   AuditService,
   can,
   type DaxRequest,
-  PUBLIC_ORIGINS,
-  type PublicOrigins,
   sessionOf,
 } from '@dax/platform-core';
 import { PrismaService } from '@dax/platform-db';
@@ -34,7 +31,6 @@ export class LabelsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    @Inject(PUBLIC_ORIGINS) private readonly origins: PublicOrigins,
   ) {}
 
   @Post()
@@ -90,7 +86,7 @@ export class LabelsController {
       if (!row) invalid('Some of the selected items were not found.', ['ids']);
       return {
         kind: 'item',
-        url: qrUrl(this.origins.labels, 'item', row.qrToken),
+        token: row.qrToken,
         partNo: row.partNo,
         brand: row.brand.name,
         description: row.description,
@@ -116,7 +112,7 @@ export class LabelsController {
       if (!row) invalid('Some of the selected bins were not found.', ['ids']);
       return {
         kind: 'bin',
-        url: qrUrl(this.origins.labels, 'bin', row.qrToken),
+        token: row.qrToken,
         code: row.code,
         zone: row.zone.name,
         binKind: row.kind === 'STORAGE' ? null : row.kind,

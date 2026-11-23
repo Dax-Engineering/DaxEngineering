@@ -8,7 +8,14 @@ import {
   SEEDED_ROLES,
   type UserStatusFilter,
 } from '@dax/platform-contract';
-import { Empty, Icon, Mono, Pill, SectionCard } from '@dax/web-shell';
+import {
+  Empty,
+  Icon,
+  Mono,
+  Pill,
+  SectionCard,
+  ScrollTable,
+} from '@dax/web-shell';
 import { STATUS_TONES, userStatus } from '../../../lib/format';
 
 const SUPER_ADMIN = SEEDED_ROLES.super_admin.name;
@@ -90,7 +97,7 @@ export function UsersTable({
         </div>
       ) : (
         <Table.ScrollContainer minWidth={760}>
-          <Table verticalSpacing="sm">
+          <ScrollTable verticalSpacing="sm">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Name</Table.Th>
@@ -155,7 +162,7 @@ export function UsersTable({
                 );
               })}
             </Table.Tbody>
-          </Table>
+          </ScrollTable>
         </Table.ScrollContainer>
       )}
       {pager}

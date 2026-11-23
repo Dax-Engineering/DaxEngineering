@@ -11,7 +11,7 @@ import {
 } from '@mantine/core';
 import { startTransition, useActionState, useState } from 'react';
 import type { DepartmentDto } from '@dax/platform-contract';
-import { Empty, Pill, SectionCard } from '@dax/web-shell';
+import { Empty, Pill, SectionCard, ScrollTable } from '@dax/web-shell';
 import { StateAlert } from '../../../components/state-alert';
 import { fieldError, IDLE } from '../../../lib/action-state';
 import { createDepartment, updateDepartment } from './actions';
@@ -135,7 +135,7 @@ export function DepartmentsTable({
         </div>
       ) : (
         <Table.ScrollContainer minWidth={420}>
-          <Table verticalSpacing="sm">
+          <ScrollTable verticalSpacing="sm">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Name</Table.Th>
@@ -152,7 +152,7 @@ export function DepartmentsTable({
                 />
               ))}
             </Table.Tbody>
-          </Table>
+          </ScrollTable>
         </Table.ScrollContainer>
       )}
     </SectionCard>

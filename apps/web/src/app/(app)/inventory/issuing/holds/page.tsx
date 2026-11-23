@@ -31,7 +31,6 @@ export default async function HoldListPage({
     <>
       <PageHead
         back={{ href: BASE, label: 'Issuing' }}
-        eyebrow="Issuing"
         title="Holds"
         lede="Stock kept aside. Holds never expire; release them or turn them into an MRN."
         actions={

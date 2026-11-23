@@ -95,7 +95,6 @@ export class WorkerAppModule {
           useValue: {
             web: env.WEB_ORIGIN,
             admin: env.WEB_ORIGIN,
-            labels: env.WEB_ORIGIN,
           },
         },
       ],

@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  Table,
   TableTbody,
   TableTd,
   TableTh,
@@ -19,6 +18,7 @@ import {
   PageHead,
   Pill,
   SectionCard,
+  ScrollTable,
 } from '@dax/web-shell';
 import { ConfirmAction } from '../../../../../../components/confirm-action';
 import { LinkButton } from '../../../../../../components/links';
@@ -49,13 +49,6 @@ function stamp(s: { by: string | null; at: string } | null): string {
   if (!s) return '—';
   return s.by ? `${s.by} · ${formatDateTime(s.at)}` : formatDateTime(s.at);
 }
-
-const TITLES: Partial<Record<AodDto['status'], string>> = {
-  PICKING: 'Picking',
-  PENDING_APPROVAL: 'Awaiting approval',
-  APPROVED: 'Approved',
-  CANCELLED: 'Cancelled',
-};
 
 function Banner({
   id,
@@ -131,7 +124,7 @@ function Lines({ aod }: { aod: AodDto }) {
   return (
     <>
       <Box visibleFrom="md">
-        <Table>
+        <ScrollTable>
           <TableThead>
             <TableTr>
               <TableTh>Part</TableTh>
@@ -182,7 +175,7 @@ function Lines({ aod }: { aod: AodDto }) {
               )),
             ])}
           </TableTbody>
-        </Table>
+        </ScrollTable>
       </Box>
       <Box hiddenFrom="md" className="dax-rows">
         {groups.flatMap((g) => [
@@ -242,7 +235,8 @@ export default async function AodPage({
   const binsByLine: Record<string, BinStock[]> = Object.fromEntries(
     (mrn?.lines ?? []).map((l) => [l.id, l.bins]),
   );
-  const printable = aod.status === 'ISSUED' || aod.status === 'SIGNED';
+  const issued = aod.status === 'ISSUED' || aod.status === 'SIGNED';
+  const printable = issued && can('inventory.aod.print');
   const stores = can('inventory.aod.issue');
   const cancellable =
     aod.status === 'PICKING' ||
@@ -263,7 +257,15 @@ export default async function AodPage({
           </>
         }
         title={
-          aod.number ? <Mono>{aod.number}</Mono> : (TITLES[aod.status] ?? 'AOD')
+          aod.number ? (
+            <Mono>{aod.number}</Mono>
+          ) : aod.mrn.number ? (
+            <>
+              AOD for <Mono>{aod.mrn.number}</Mono>
+            </>
+          ) : (
+            `${AOD_TYPE_LABELS[aod.type]} AOD`
+          )
         }
         lede={who}
         actions={
@@ -283,7 +285,7 @@ export default async function AodPage({
             {printable && aod.customer ? (
               <PrintButton id={aod.id} copy="customer" />
             ) : null}
-            {printable && can('inventory.return_note.create') ? (
+            {issued && can('inventory.return_note.create') ? (
               <LinkButton
                 href={`/inventory/returns/new?aod=${aod.id}`}
                 variant="default"
@@ -326,6 +328,7 @@ export default async function AodPage({
               <ConfirmAction
                 action={aodStep}
                 payload={{ id: aod.id, version: aod.version, step: 'approve' }}
+                primary
                 label="Approve"
                 title="Approve this AOD?"
                 message="Stores can then issue it, which takes the stock out and gives it its number, and print it."
@@ -372,6 +375,7 @@ export default async function AodPage({
               <ConfirmAction
                 action={aodStep}
                 payload={{ id: aod.id, version: aod.version, step: 'issue' }}
+                primary
                 label="Issue"
                 title="Issue this AOD?"
                 message="The stock leaves its bins now and the AOD gets its number. Print it, have it signed on delivery and upload the signed copy."
@@ -406,12 +410,14 @@ export default async function AodPage({
               </p>
             </div>
             <div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <PrintButton id={aod.id} primary />
-                {aod.customer ? (
-                  <PrintButton id={aod.id} primary copy="customer" />
-                ) : null}
-              </div>
+              {printable ? (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <PrintButton id={aod.id} primary />
+                  {aod.customer ? (
+                    <PrintButton id={aod.id} primary copy="customer" />
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             {can('inventory.aod.attach_signed') ? (
               <SignUpload id={aod.id} version={aod.version} />
@@ -456,7 +462,10 @@ export default async function AodPage({
           <SectionCard title="AOD details">
             <Facts
               items={[
-                { label: 'AOD number', value: aod.number ?? 'Given on issue' },
+                {
+                  label: 'AOD number',
+                  value: aod.number ?? 'Given when issued',
+                },
                 { label: 'Type', value: AOD_TYPE_LABELS[aod.type] },
                 {
                   label: 'MRN',

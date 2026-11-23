@@ -99,7 +99,6 @@ export default async function UserPage({
   return (
     <>
       <PageHead
-        eyebrow="Admin · People"
         back={{ href: '/users', label: 'Users' }}
         title={user.name}
         lede={
