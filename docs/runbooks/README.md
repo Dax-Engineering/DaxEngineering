@@ -13,8 +13,7 @@ One page per kind of incident. Each page has the same four parts: symptoms, conf
 | [restore.md](restore.md)                 | Restoring a backup, and the monthly restore drill               |
 | [secret-rotation.md](secret-rotation.md) | A secret leaked, someone left, or a yearly rotation             |
 
-After any incident users noticed, write it up with the
-[postmortem template](../postmortem-template.md) within a week.
+After any incident users noticed, add a short entry to [incidents.md](../incidents.md).
 
 ## On call
 

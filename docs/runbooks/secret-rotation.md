@@ -23,4 +23,4 @@ then move to the next.
    app's audit log, and R2 and Resend activity.
 2. If it was committed to git, rotating is the fix. Rewriting history doesn't help once it was
    pushed.
-3. Write it up with the [postmortem template](../postmortem-template.md).
+3. Add an entry to [incidents.md](../incidents.md).
