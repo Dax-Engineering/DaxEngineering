@@ -24,11 +24,17 @@ export const REDACT_PATHS = [
 ];
 
 const REQUEST_ID = /^[A-Za-z0-9._-]{8,64}$/;
+const assigned = new WeakMap<IncomingMessage, string>();
 
+/** One id per request, shared by the logs, the request context and error reports. */
 export function requestIdFor(req: IncomingMessage): string {
+  const known = assigned.get(req);
+  if (known) return known;
   const incoming = req.headers['x-request-id'];
   const value = Array.isArray(incoming) ? incoming[0] : incoming;
-  return value && REQUEST_ID.test(value) ? value : randomUUID();
+  const id = value && REQUEST_ID.test(value) ? value : randomUUID();
+  assigned.set(req, id);
+  return id;
 }
 
 export function createLoggerModule(options: LoggingOptions) {

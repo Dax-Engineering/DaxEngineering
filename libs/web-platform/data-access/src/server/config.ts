@@ -47,9 +47,19 @@ export function appCookies(app: AppName, cookieHeader: string | null): string {
     .join('; ');
 }
 
+/** The leftmost X-Forwarded-For entry is whatever the client sent; Traefik sets X-Real-Ip and appends on the right. */
 export function clientIp(headers: Headers): string | null {
-  const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  return forwarded || headers.get('x-real-ip') || null;
+  const real = headers.get('x-real-ip')?.trim();
+  if (real) return real;
+  const forwarded = headers.get('x-forwarded-for')?.split(',').at(-1)?.trim();
+  return forwarded || null;
+}
+
+const REQUEST_ID = /^[A-Za-z0-9._-]{8,64}$/;
+
+export function requestId(headers: Headers): string {
+  const incoming = headers.get('x-request-id');
+  return incoming && REQUEST_ID.test(incoming) ? incoming : randomUUID();
 }
 
 export function forwardHeaders(
@@ -59,7 +69,7 @@ export function forwardHeaders(
 ): Headers {
   const headers = new Headers();
   headers.set('x-internal-token', config.internalToken);
-  headers.set('x-request-id', randomUUID());
+  headers.set('x-request-id', requestId(incoming));
   const cookies = appCookies(app, incoming.get('cookie'));
   if (cookies) headers.set('cookie', cookies);
   const ip = clientIp(incoming);

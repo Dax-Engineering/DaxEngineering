@@ -1,10 +1,13 @@
+import './instrument';
 import { NestFactory } from '@nestjs/core';
+import { getGlobalScope } from '@sentry/nestjs';
 import { Logger } from 'nestjs-pino';
 import { InventoryJobsModule } from '@dax/inventory-server';
 import { WorkerService } from '@dax/platform-core';
 import { loadWorkerEnv, WorkerAppModule } from './worker.module';
 
 async function bootstrap(): Promise<void> {
+  getGlobalScope().setTag('service', 'worker');
   const env = loadWorkerEnv();
   const app = await NestFactory.createApplicationContext(
     WorkerAppModule.forRoot(env, [InventoryJobsModule]),

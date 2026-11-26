@@ -30,7 +30,7 @@ import {
   OutboxProcessor,
 } from './outbox.processor';
 import { workerSettings } from './worker.options';
-import { WorkerService } from './worker.service';
+import { DB_HEARTBEAT_EVERY_MS, WorkerService } from './worker.service';
 
 const GoodsReceived = defineEvent(
   'inventory.goods_received.v1',
@@ -556,9 +556,10 @@ describe('WorkerService', () => {
       failed: 0,
     }));
     const tick = vi.fn(async () => ({}));
+    const recordHeartbeat = vi.fn(async () => undefined);
     const worker = new WorkerService(
       { processBatch } as unknown as OutboxProcessor,
-      { tick } as unknown as JobRunner,
+      { tick, recordHeartbeat } as unknown as JobRunner,
       workerSettings({ pollIntervalMs: 60_000 }),
     );
     worker.start();
@@ -567,6 +568,7 @@ describe('WorkerService', () => {
     await worker.stop();
     expect(Date.now() - started).toBeLessThan(1000);
     expect(processBatch).toHaveBeenCalledTimes(1);
+    expect(recordHeartbeat).toHaveBeenCalledTimes(1);
   });
 
   it('keeps going after a failed cycle and drains full batches without sleeping', async () => {
@@ -578,7 +580,10 @@ describe('WorkerService', () => {
     });
     const worker = new WorkerService(
       { processBatch } as unknown as OutboxProcessor,
-      { tick: vi.fn(async () => ({})) } as unknown as JobRunner,
+      {
+        tick: vi.fn(async () => ({})),
+        recordHeartbeat: vi.fn(async () => undefined),
+      } as unknown as JobRunner,
       workerSettings({ pollIntervalMs: 5 }),
     );
     worker.start();
@@ -586,5 +591,32 @@ describe('WorkerService', () => {
       expect(processBatch.mock.calls.length).toBeGreaterThanOrEqual(5),
     );
     await worker.stop();
+  });
+
+  it('writes the database heartbeat at most every 30 seconds', async () => {
+    const recordHeartbeat = vi.fn(async () => undefined);
+    const worker = new WorkerService(
+      {
+        processBatch: vi.fn(async () => ({
+          claimed: 0,
+          done: 0,
+          retried: 0,
+          failed: 0,
+        })),
+      } as unknown as OutboxProcessor,
+      {
+        tick: vi.fn(async () => ({})),
+        recordHeartbeat,
+      } as unknown as JobRunner,
+      workerSettings(),
+    );
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    await worker.runOnce();
+    await worker.runOnce();
+    expect(recordHeartbeat).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(1_000_000 + DB_HEARTBEAT_EVERY_MS);
+    await worker.runOnce();
+    expect(recordHeartbeat).toHaveBeenCalledTimes(2);
+    now.mockRestore();
   });
 });

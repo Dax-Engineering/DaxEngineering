@@ -55,6 +55,12 @@ jobs:
               target: runtime,
               app: admin,
             }
+          - {
+              name: dax-backup,
+              file: infra/backup/Dockerfile,
+              target: '',
+              app: '',
+            }
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v3

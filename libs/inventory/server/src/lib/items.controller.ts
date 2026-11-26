@@ -27,7 +27,12 @@ import {
   ItemUpdate,
   SupersedeInput,
 } from '@dax/inventory-contract';
-import { type DaxRequest, Requires, sessionOf } from '@dax/platform-core';
+import {
+  type DaxRequest,
+  RateLimit,
+  Requires,
+  sessionOf,
+} from '@dax/platform-core';
 import { z } from 'zod';
 import { parse } from './common';
 import { ItemsService } from './items.service';
@@ -75,6 +80,7 @@ export class ItemsController {
   }
 
   @Post('import')
+  @RateLimit(10)
   @Requires('inventory.item.import')
   async import(
     @Req() req: DaxRequest,

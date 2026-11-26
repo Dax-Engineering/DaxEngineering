@@ -47,6 +47,7 @@ const EnvSchema = z
     BOOTSTRAP_ADMIN_USERNAME: blankAsUnset(Username),
     BOOTSTRAP_ADMIN_EMAIL: blankAsUnset(z.email()),
     BOOTSTRAP_ADMIN_PASSWORD: blankAsUnset(z.string().min(PASSWORD_MIN_LENGTH)),
+    SENTRY_DSN: blankAsUnset(z.url()),
   })
   .superRefine((env, ctx) => {
     if (env.INTERNAL_TOKEN_WEB === env.INTERNAL_TOKEN_ADMIN) {

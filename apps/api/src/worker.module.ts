@@ -39,6 +39,7 @@ const WorkerEnvSchema = z.object({
   WEB_ORIGIN: z.url().default('http://localhost:3000'),
   RESEND_API_KEY: blankAsUnset(z.string().min(1)),
   MAIL_FROM: blankAsUnset(z.string().min(3)),
+  SENTRY_DSN: blankAsUnset(z.url()),
 });
 
 export type WorkerEnv = z.infer<typeof WorkerEnvSchema>;

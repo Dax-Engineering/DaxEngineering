@@ -31,6 +31,22 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
+
+      # The gitleaks image is free; the gitleaks Action needs a licence for organisations.
+      - name: Scan commits for secrets
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          range="${BASE_SHA}..${GITHUB_SHA}"
+          if [ -z "${BASE_SHA}" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            range="${GITHUB_SHA}~1..${GITHUB_SHA}"
+          fi
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" \
+            zricethezav/gitleaks:v8.28.0 \
+            git --redact --no-banner --log-opts="$range" /repo
+
       - uses: nrwl/nx-set-shas@v4
 
       - run: pnpm nx sync:check

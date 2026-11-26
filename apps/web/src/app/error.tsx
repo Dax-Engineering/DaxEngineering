@@ -1,9 +1,18 @@
 'use client';
 
 import { Button } from '@mantine/core';
+import { useEffect } from 'react';
+import { reportClientError } from '@dax/web-data-access/monitoring-client';
 import { Icon, StatusPage } from '@dax/web-shell';
 
-export default function RootError({ reset }: { reset: () => void }) {
+export default function RootError({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
+  useEffect(() => reportClientError(error), [error]);
   return (
     <StatusPage
       scene="error"

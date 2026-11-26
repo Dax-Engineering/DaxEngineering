@@ -18,7 +18,12 @@ import {
   type CustomerPage,
   PartyImportQuery,
 } from '@dax/parties-contract';
-import { type DaxRequest, Requires, sessionOf } from '@dax/platform-core';
+import {
+  type DaxRequest,
+  RateLimit,
+  Requires,
+  sessionOf,
+} from '@dax/platform-core';
 import { csvTemplate } from './csv-import';
 import { actorOf, importText, parse } from './http';
 import { CUSTOMERS } from './kinds';
@@ -43,6 +48,7 @@ export class CustomersController {
   }
 
   @Post('import')
+  @RateLimit(10)
   @Requires('parties.customer.import')
   @HttpCode(200)
   importCsv(

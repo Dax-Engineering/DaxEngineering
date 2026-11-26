@@ -9,10 +9,21 @@ BEGIN
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I TO dax_app', s);
     EXECUTE format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %I TO dax_app', s);
     EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA %I TO dax_backup', s);
+    EXECUTE format('GRANT SELECT ON ALL SEQUENCES IN SCHEMA %I TO dax_backup', s);
     EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE dax_owner IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO dax_app', s);
     EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE dax_owner IN SCHEMA %I GRANT USAGE, SELECT ON SEQUENCES TO dax_app', s);
     EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE dax_owner IN SCHEMA %I GRANT SELECT ON TABLES TO dax_backup', s);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE dax_owner IN SCHEMA %I GRANT SELECT ON SEQUENCES TO dax_backup', s);
   END LOOP;
+END $$;
+
+-- The nightly dump also needs the migration history, so a restore can migrate forward.
+GRANT USAGE ON SCHEMA public TO dax_backup;
+DO $$
+BEGIN
+  IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
+    GRANT SELECT ON public._prisma_migrations TO dax_backup;
+  END IF;
 END $$;
 
 DO $$

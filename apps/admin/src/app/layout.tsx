@@ -4,6 +4,10 @@ import '@dax/web-shell/styles.css';
 import './global.css';
 import { mantineHtmlProps } from '@mantine/core';
 import { headers } from 'next/headers';
+import {
+  browserMonitoringJson,
+  MONITORING_ELEMENT_ID,
+} from '@dax/web-data-access/monitoring';
 import { THEME_SCRIPT } from '@dax/web-shell/server';
 import { DaxProvider } from '@dax/web-shell';
 import { fontVariables } from '@dax/web-shell/fonts';
@@ -28,6 +32,9 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const h = await headers();
+  const nonce = h.get('x-nonce') ?? undefined;
+  const monitoring = browserMonitoringJson('admin', h.get('x-request-id'));
   return (
     <html lang="en" className={fontVariables} {...mantineHtmlProps}>
       <head>
@@ -37,10 +44,19 @@ export default async function RootLayout({
             Browsers hide the nonce after load, hence suppressHydrationWarning. */}
         <script
           id="dax-theme"
-          nonce={(await headers()).get('x-nonce') ?? undefined}
+          nonce={nonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
         />
+        {monitoring && (
+          <script
+            id={MONITORING_ELEMENT_ID}
+            type="application/json"
+            nonce={nonce}
+            suppressHydrationWarning
+            dangerouslySetInnerHTML={{ __html: monitoring }}
+          />
+        )}
       </head>
       <body>
         <DaxProvider>{children}</DaxProvider>
