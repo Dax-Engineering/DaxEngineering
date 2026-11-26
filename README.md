@@ -23,7 +23,7 @@ libs/
   web-platform/  data-access (server-only API client), shell
   parties/       customers and suppliers module
   inventory/     stores and inventory module
-infra/           Postgres roles, Dockerfiles, Dokploy compose
+infra/           Postgres roles, Dockerfiles, Coolify compose
 tools/scripts/   prisma-lint, copy-lint, native Postgres/MinIO helpers
 ```
 
@@ -48,6 +48,6 @@ Run all checks (same as CI): `pnpm check`
 
 ## Deployment
 
-Contabo VPS running Dokploy, with separate staging and production stacks. Pushing to `main` builds
-images and deploys staging; production deploys are manual and need approval.
-See [infra/dokploy/README.md](infra/dokploy/README.md).
+Contabo VPS running Coolify, with separate staging and production environments. Pushing to `main`
+builds images and deploys staging; production deploys are manual and need approval.
+See [infra/coolify/README.md](infra/coolify/README.md).
