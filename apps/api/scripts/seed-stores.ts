@@ -33,6 +33,10 @@ import {
 // the one place outside it that needs to post an opening count directly.
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { CountsService } from '../../../libs/inventory/server/src/lib/counts/counts.service';
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { makeExistingSerials } from '../../../libs/inventory/server/src/lib/receiving/serials';
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { rebuildStockAge } from '../../../libs/inventory/server/src/lib/stock/stock-age';
 import { assertLocalDatabase } from './seed-guard';
 import { seedDocuments } from './stores-seed-documents';
 import {
@@ -47,6 +51,7 @@ import {
   SUPPLIERS,
   ZONES,
 } from './stores-seed-data';
+import { SAMPLE_PASSWORD, seedSampleUsers } from './stores-seed-users';
 
 const ENTITIES: EntityDef[] = [...INVENTORY_ENTITIES, ...PARTIES_ENTITIES];
 
@@ -118,7 +123,7 @@ async function main() {
     });
     if (already > 0) {
       console.log(
-        'Stores seed is already in this database. Run pnpm db:unseed:stores first to start again.',
+        'Stores seed is already in this database. Run pnpm db:reseed:stores to wipe the stores data and load it fresh.',
       );
       return;
     }
@@ -152,6 +157,19 @@ async function main() {
       });
     }
     await locations.ensureSpecialAreas();
+
+    // Documents use the first active department; its head approves their AODs.
+    const department = await prisma.department.findFirst({
+      where: { active: true },
+      orderBy: { name: 'asc' },
+      select: { id: true },
+    });
+    if (!department)
+      throw new Error(
+        'There is no active department. Turn one on in the admin app first.',
+      );
+    console.log('Sample sign-in accounts');
+    const sampleUsers = await seedSampleUsers(prisma, department.id);
 
     // Brands and models have no "created by", so each one the seed creates gets
     // an audit "create" row from the seed user. The reverse removes only those,
@@ -362,14 +380,39 @@ async function main() {
       engine,
     });
 
+    // Age layers and serials for the opening stock, the way the worker's
+    // one-time jobs make them on a live database.
+    console.log('Stock age layers and serials for existing stock');
+    const made = await prisma.$transaction(
+      async (tx) => {
+        await rebuildStockAge(tx);
+        const serials = await makeExistingSerials(tx);
+        await tx.stockAgeSettings.update({
+          where: { id: 1 },
+          data: { rebuiltAt: new Date() },
+        });
+        await tx.itemSerialSettings.update({
+          where: { id: 1 },
+          data: { existingDoneAt: new Date() },
+        });
+        return serials;
+      },
+      { timeout: 120_000 },
+    );
+
     console.log('');
     console.log(
-      `Done. Opening count ${count.number} posted ${lines} stock lines.`,
+      `Done. Opening count ${count.number} posted ${lines} stock lines; ${made} serials made for stock already on the shelves.`,
     );
     console.log(
       `${ZONES.length} zones, ${bins.length} bins, ${ITEMS.length} items, ${CUSTOMERS.length} customers, ${SUPPLIERS.length} suppliers.`,
     );
     for (const line of documents) console.log(`  ${line}`);
+    console.log('');
+    console.log(
+      `Sample sign-ins (password ${SAMPLE_PASSWORD}, local dev only):`,
+    );
+    for (const line of sampleUsers) console.log(`  ${line}`);
   } finally {
     await prisma.$disconnect();
   }

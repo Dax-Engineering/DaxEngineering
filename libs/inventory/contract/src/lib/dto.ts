@@ -377,7 +377,11 @@ export const BinBulkResult = z.object({
 });
 
 export const StockRow = z.object({
-  item: ItemRef.extend({ description: z.string(), uom: z.string() }),
+  item: ItemRef.extend({
+    description: z.string(),
+    uom: z.string(),
+    status: z.enum(['ACTIVE', 'ARCHIVED']),
+  }),
   supplier: Ref.nullable(),
   tags: z.array(z.string()),
   machineTypes: z.array(Ref),
@@ -401,6 +405,9 @@ export const StockPage = pageOf(StockRow);
 export type StockPage = z.infer<typeof StockPage>;
 export const StockQuery = PageQuery.extend({
   zoneId: z.uuid().optional(),
+  brandId: z.uuid().optional(),
+  machineModelId: z.uuid().optional(),
+  status: z.enum(['ACTIVE', 'ARCHIVED', 'ALL']).default('ACTIVE'),
   supplierId: z.uuid().optional(),
   machineTypeId: z.uuid().optional(),
   tag: Tag.optional(),

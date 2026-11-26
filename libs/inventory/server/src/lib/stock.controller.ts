@@ -36,7 +36,16 @@ export class StockController {
     };
     const where: Prisma.ItemWhereInput = {
       AND: [
-        { status: 'ACTIVE', supersededById: null },
+        query.status === 'ALL' ? {} : { status: query.status },
+        { supersededById: null },
+        query.brandId ? { brandId: query.brandId } : {},
+        query.machineModelId
+          ? {
+              machineModels: {
+                some: { machineModelId: query.machineModelId },
+              },
+            }
+          : {},
         query.zoneId
           ? { familyMembers: { some: { binStock: { some: binFilter } } } }
           : {},
@@ -58,6 +67,7 @@ export class StockController {
         partNo: true,
         description: true,
         uom: true,
+        status: true,
         minQty: true,
         brand: { select: { name: true } },
         ...ITEM_EXTRAS_SELECT,
@@ -101,6 +111,7 @@ export class StockController {
             brand: r.brand.name,
             description: r.description,
             uom: r.uom,
+            status: r.status,
           },
           ...itemExtras(r),
           stock: family.stock,

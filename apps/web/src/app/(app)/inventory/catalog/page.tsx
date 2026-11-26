@@ -24,7 +24,7 @@ export default async function CatalogPage() {
   return (
     <>
       <PageHead
-        back={{ href: '/inventory/items', label: 'Items' }}
+        back={{ href: '/inventory/stock', label: 'Stock' }}
         title="Brands and machine models"
         lede="Items pick their brand and the machines they fit from these lists. Each machine model can have a type, like Excavator. Turn an entry off instead of deleting it; items keep it."
       />

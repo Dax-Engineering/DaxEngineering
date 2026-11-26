@@ -17,13 +17,13 @@ const SECTIONS = [
     key: 'stock',
     label: 'Stock',
     icon: 'boxes',
-    menu: ['inventory.stock', 'inventory.locations', 'inventory.counts'],
-  },
-  {
-    key: 'items',
-    label: 'Items',
-    icon: 'tag',
-    menu: ['inventory.items', 'inventory.bundles', 'inventory.catalog'],
+    menu: [
+      'inventory.stock',
+      'inventory.locations',
+      'inventory.counts',
+      'inventory.bundles',
+      'inventory.catalog',
+    ],
   },
   {
     key: 'receiving',
@@ -57,6 +57,12 @@ const SECTIONS = [
   },
 ];
 
+/** The Stock tab lists parts; part pages still live under /inventory/items. */
+const TAB_LABELS: Record<string, string> = { 'inventory.stock': 'Parts' };
+const TAB_MATCHES: Record<string, string[]> = {
+  'inventory.stock': ['/inventory/items'],
+};
+
 type MenuEntry = {
   key: string;
   label: string;
@@ -71,13 +77,21 @@ function buildNav(menu: MenuEntry[]): ShellNavItem[] {
     const tabs = section.menu
       .map((key) => byKey.get(key))
       .filter((m): m is MenuEntry => m !== undefined)
-      .map(({ key, label, path }) => ({ key, label, path }));
+      .map(({ key, label, path }) => ({
+        key,
+        label: TAB_LABELS[key] ?? label,
+        path,
+        matches: TAB_MATCHES[key],
+      }));
     const first = tabs[0];
     if (!first) return [];
     return [
       {
         key: section.key,
-        label: tabs.length === 1 ? first.label : section.label,
+        label:
+          tabs.length === 1
+            ? (byKey.get(first.key)?.label ?? first.label)
+            : section.label,
         path: first.path,
         icon: section.icon,
         tabs,

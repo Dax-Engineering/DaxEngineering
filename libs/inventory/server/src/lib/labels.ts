@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import QRCode from 'qrcode';
 import { code128Bars, code128Modules } from '@dax/inventory-contract';
 
 export const LABEL_SHEET = {
@@ -15,6 +16,8 @@ export const LABEL_SHEET = {
   paddingMm: 3,
   barcodeHeightMm: 11,
   quietModules: 10,
+  qrSizeMm: 28,
+  qrQuietModules: 2,
 } as const;
 
 export type SheetGeometry = typeof LABEL_SHEET;
@@ -59,7 +62,7 @@ export function withCopies<T>(labels: readonly T[], copies: number): T[] {
 export type LabelContent =
   | {
       kind: 'item';
-      /** Label token, encoded in the Code 128 barcode. */
+      /** Label token: Code 128 on part labels, a QR code on bin labels. */
       token: string;
       partNo: string;
       brand: string;
@@ -92,6 +95,31 @@ function drawBarcode(
   const module = w / (code128Modules(text) + quiet * 2);
   for (const [start, width] of code128Bars(text)) {
     doc.rect(x + (start + quiet) * module, y, width * module, h);
+  }
+  doc.fillColor('black').fill();
+}
+
+/** A QR code `size` square, drawn as filled runs so it stays crisp when printed. */
+function drawQr(doc: Doc, value: string, x: number, y: number, size: number) {
+  const matrix = QRCode.create(value, { errorCorrectionLevel: 'M' }).modules;
+  const quiet = LABEL_SHEET.qrQuietModules;
+  const module = size / (matrix.size + quiet * 2);
+  for (let r = 0; r < matrix.size; r++) {
+    let c = 0;
+    while (c < matrix.size) {
+      if (!matrix.get(r, c)) {
+        c++;
+        continue;
+      }
+      const start = c;
+      while (c < matrix.size && matrix.get(r, c)) c++;
+      doc.rect(
+        x + (start + quiet) * module,
+        y + (r + quiet) * module,
+        (c - start) * module,
+        module,
+      );
+    }
   }
   doc.fillColor('black').fill();
 }
@@ -197,9 +225,27 @@ export function renderLabels(
     const y = mm(slot.yMm);
     const w = mm(g.cellWidthMm) - pad * 2;
     const bottom = y + mm(g.cellHeightMm) - pad;
-    drawText(doc, label, x, y + pad, w);
     doc.font('Courier').fontSize(7);
     const tokenH = doc.currentLineHeight(true);
+    if (label.kind === 'bin') {
+      // Bins keep a QR code: square, readable from further away on a shelf.
+      const qr = mm(g.qrSizeMm);
+      const qrY = y + (mm(g.cellHeightMm) - qr) / 2;
+      drawQr(doc, label.token, x, qrY, qr);
+      const textX = x + qr + mm(2);
+      const textW = w - qr - mm(2);
+      drawText(doc, label, textX, qrY + mm(1), textW);
+      doc
+        .font('Courier')
+        .fontSize(7)
+        .fillColor('black')
+        .text(label.token, textX, qrY + qr - tokenH - mm(1), {
+          width: textW,
+          lineGap: 0,
+        });
+      return;
+    }
+    drawText(doc, label, x, y + pad, w);
     const barY = bottom - tokenH - mm(0.6) - barH;
     drawBarcode(doc, label.token, x, barY, w, barH);
     doc.fillColor('black').text(label.token, x, bottom - tokenH, {

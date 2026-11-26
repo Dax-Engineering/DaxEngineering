@@ -165,6 +165,9 @@ export default async function LocationsPage({
                         </TableTh>
                       ) : null}
                       <TableTh>Bin</TableTh>
+                      <TableTh>Rack</TableTh>
+                      <TableTh>Shelf</TableTh>
+                      <TableTh>Position</TableTh>
                       <TableTh ta="right">Items</TableTh>
                       <TableTh>Notes</TableTh>
                       <TableTh />
@@ -174,7 +177,7 @@ export default async function LocationsPage({
                     <ZoneTbody
                       key={group.zone.id}
                       zone={group.zone}
-                      columns={4}
+                      columns={7}
                       selectable={canPrint}
                     >
                       {group.bins.map((bin) => (
@@ -188,6 +191,15 @@ export default async function LocationsPage({
                             <Link href={bins(bin)} className="dax-link">
                               <Mono>{bin.code}</Mono>
                             </Link>
+                          </TableTd>
+                          <TableTd>
+                            <Mono>{bin.rack}</Mono>
+                          </TableTd>
+                          <TableTd>
+                            <Mono>{bin.shelf}</Mono>
+                          </TableTd>
+                          <TableTd>
+                            <Mono>{bin.position}</Mono>
                           </TableTd>
                           <TableTd className="dax-num">{bin.itemCount}</TableTd>
                           <TableTd>
@@ -226,6 +238,10 @@ export default async function LocationsPage({
                           >
                             <Mono>{bin.code}</Mono>
                           </Link>
+                          <span className="dax-sub">
+                            Rack {bin.rack} · Shelf {bin.shelf} · Position{' '}
+                            {bin.position}
+                          </span>
                           <span className="dax-sub">
                             {bin.itemCount}{' '}
                             {bin.itemCount === 1 ? 'item' : 'items'}

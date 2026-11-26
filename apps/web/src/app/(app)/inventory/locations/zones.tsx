@@ -102,7 +102,7 @@ function ZoneCard({ zone, canManage }: { zone: ZoneDto; canManage: boolean }) {
         )}
       </div>
       {canManage ? (
-        <Group gap="xs" justify="flex-end">
+        <Group gap="xs" justify="flex-end" className="dax-zone-card-actions">
           {editing ? (
             <>
               <Button
@@ -123,7 +123,11 @@ function ZoneCard({ zone, canManage }: { zone: ZoneDto; canManage: boolean }) {
               </Button>
             </>
           ) : (
-            <Button variant="subtle" size="xs" onClick={() => setEditing(true)}>
+            <Button
+              variant="default"
+              size="xs"
+              onClick={() => setEditing(true)}
+            >
               Rename
             </Button>
           )}

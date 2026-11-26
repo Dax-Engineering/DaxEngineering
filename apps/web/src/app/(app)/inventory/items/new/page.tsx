@@ -11,7 +11,7 @@ export default async function NewItemPage() {
   return (
     <>
       <PageHead
-        back={{ href: '/inventory/items', label: 'Items' }}
+        back={{ href: '/inventory/stock', label: 'Stock' }}
         title="New item"
         lede="Part number, brand, unit and minimum stock. Add barcodes after saving."
       />

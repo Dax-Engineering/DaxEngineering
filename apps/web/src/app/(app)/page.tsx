@@ -59,15 +59,13 @@ export default async function HomePage({
         label: 'Items',
         value: count.format(inventory.items),
         tone: 'int',
-        href: '/inventory/items',
+        href: canSeeStock ? '/inventory/stock' : undefined,
       },
       {
         label: 'Below minimum',
         value: count.format(inventory.belowMin),
         tone: 'bad',
-        href: canSeeStock
-          ? '/inventory/stock?belowMin=true'
-          : '/inventory/items?belowMin=true',
+        href: canSeeStock ? '/inventory/stock?belowMin=true' : undefined,
       },
       {
         label: 'In stock',
@@ -208,11 +206,11 @@ export default async function HomePage({
       use: 'sometimes',
       count: inventory?.agedOver,
     });
-  if (canSeeItems)
+  if (canSeeStock)
     tiles.push({
-      href: '/inventory/items',
+      href: '/inventory/stock',
       title: 'Find a part',
-      sub: 'Search by part number, description or barcode.',
+      sub: 'Search parts and see on hand, held and free by bin.',
       icon: 'search',
       use: 'often',
     });
@@ -223,14 +221,6 @@ export default async function HomePage({
       sub: 'Part number, brand, unit and minimum.',
       icon: 'plus',
       use: 'rarely',
-    });
-  if (canSeeStock)
-    tiles.push({
-      href: '/inventory/stock',
-      title: 'Check stock',
-      sub: 'On hand, held and free by bin.',
-      icon: 'boxes',
-      use: 'often',
     });
   if (can('inventory.location.print_label'))
     tiles.push({
@@ -283,9 +273,9 @@ export default async function HomePage({
         title={`${greeting()}, ${firstName}`}
         lede="Find parts, check stock and print labels for the main store."
         actions={
-          canSeeItems ? (
+          canSeeStock ? (
             <SearchBox
-              action="/inventory/items"
+              action="/inventory/stock"
               label="Find a part"
               placeholder="Search parts, barcodes…"
             />

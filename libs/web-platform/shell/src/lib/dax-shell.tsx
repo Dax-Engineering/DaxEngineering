@@ -22,6 +22,8 @@ export interface ShellNavTab {
   key: string;
   label: string;
   path: string;
+  /** Other path prefixes that count as this tab, e.g. its detail pages. */
+  matches?: string[];
 }
 
 export interface ShellNavItem extends ShellNavTab {
@@ -30,7 +32,10 @@ export interface ShellNavItem extends ShellNavTab {
 }
 
 export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter((p) => /^[\p{L}\p{N}]/u.test(p));
   const first = parts[0]?.[0] ?? '?';
   const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
   return (first + last).toUpperCase();
@@ -173,8 +178,12 @@ export function DaxShell({
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const match = nav
     .flatMap((item) => (item.tabs ?? [item]).map((tab) => ({ item, tab })))
-    .filter(({ tab }) => isActive(pathname, tab.path))
-    .sort((a, b) => b.tab.path.length - a.tab.path.length)[0];
+    .flatMap(({ item, tab }) =>
+      [tab.path, ...(tab.matches ?? [])]
+        .filter((p) => isActive(pathname, p))
+        .map((p) => ({ item, tab, len: p.length })),
+    )
+    .sort((a, b) => b.len - a.len)[0];
   const current = match?.item;
   const tabs = current?.tabs && current.tabs.length > 1 ? current.tabs : null;
 

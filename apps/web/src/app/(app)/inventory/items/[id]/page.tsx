@@ -89,7 +89,7 @@ export default async function ItemPage({
   return (
     <>
       <PageHead
-        back={{ href: '/inventory/items', label: 'Items' }}
+        back={{ href: '/inventory/stock', label: 'Stock' }}
         eyebrow={item.brand.name}
         title={<Mono>{item.partNo}</Mono>}
         lede={item.description}
