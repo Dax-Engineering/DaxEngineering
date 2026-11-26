@@ -1,0 +1,38 @@
+#!/bin/bash
+# pgBackRest with its settings taken from the PITR_* variables, so there is no config file.
+set -euo pipefail
+
+for name in PITR_S3_ENDPOINT PITR_S3_BUCKET PITR_S3_ACCESS_KEY_ID PITR_S3_SECRET_ACCESS_KEY PITR_CIPHER_PASS; do
+  if [ -z "${!name:-}" ]; then
+    echo "$name is not set" >&2
+    exit 2
+  fi
+done
+
+endpoint="${PITR_S3_ENDPOINT#https://}"
+endpoint="${endpoint%/}"
+
+export PGBACKREST_STANZA=dax
+# Restores write this into restore_command, so recovery also gets these settings.
+export PGBACKREST_CMD=/usr/local/bin/dax-pgbackrest
+export PGBACKREST_PG1_PATH="${PGDATA:?}"
+export PGBACKREST_PG1_SOCKET_PATH=/var/run/postgresql
+export PGBACKREST_REPO1_TYPE=s3
+export PGBACKREST_REPO1_PATH=/pgbackrest
+export PGBACKREST_REPO1_S3_ENDPOINT="$endpoint"
+export PGBACKREST_REPO1_S3_BUCKET="$PITR_S3_BUCKET"
+export PGBACKREST_REPO1_S3_REGION="${PITR_S3_REGION:-auto}"
+export PGBACKREST_REPO1_S3_KEY="$PITR_S3_ACCESS_KEY_ID"
+export PGBACKREST_REPO1_S3_KEY_SECRET="$PITR_S3_SECRET_ACCESS_KEY"
+export PGBACKREST_REPO1_S3_URI_STYLE=path
+export PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc
+export PGBACKREST_REPO1_CIPHER_PASS="$PITR_CIPHER_PASS"
+export PGBACKREST_REPO1_RETENTION_FULL="${PITR_RETENTION_FULL:-3}"
+export PGBACKREST_COMPRESS_TYPE=zst
+# If R2 is unreachable for long, drop WAL rather than fill the disk. The PITR check then fails.
+export PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX=4GiB
+export PGBACKREST_LOG_LEVEL_CONSOLE="${PITR_LOG_LEVEL:-warn}"
+export PGBACKREST_LOG_LEVEL_FILE=off
+export PGBACKREST_LOCK_PATH=/tmp/pgbackrest
+
+exec pgbackrest "$@"

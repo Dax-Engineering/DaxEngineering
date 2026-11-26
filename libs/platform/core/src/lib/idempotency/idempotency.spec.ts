@@ -3,6 +3,7 @@ import { lastValueFrom, type Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { Prisma, type PrismaService } from '@dax/platform-db';
 import {
+  ABANDONED_AFTER_MS,
   IdempotencyInterceptor,
   REPLAYED_HEADER,
   requestHash,
@@ -15,6 +16,7 @@ interface Row {
   requestHash: string;
   statusCode: number | null;
   response: unknown;
+  createdAt: Date;
 }
 
 type KeyWhere = { where: { userId_key: { userId: string; key: string } } };
@@ -28,7 +30,11 @@ function fakePrisma() {
     `${w.userId_key.userId}|${w.userId_key.key}`;
   const idempotencyKey = {
     create: vi.fn(
-      async ({ data }: { data: Omit<Row, 'statusCode' | 'response'> }) => {
+      async ({
+        data,
+      }: {
+        data: Omit<Row, 'statusCode' | 'response' | 'createdAt'>;
+      }) => {
         const k = `${data.userId}|${data.key}`;
         if (rows.has(k)) {
           throw new Prisma.PrismaClientKnownRequestError(
@@ -39,7 +45,12 @@ function fakePrisma() {
             },
           );
         }
-        const row = { ...data, statusCode: null, response: null };
+        const row = {
+          ...data,
+          statusCode: null,
+          response: null,
+          createdAt: new Date(),
+        };
         rows.set(k, row);
         return row;
       },
@@ -63,6 +74,24 @@ function fakePrisma() {
     delete: vi.fn(async ({ where }: KeyWhere) => {
       rows.delete(id(where));
     }),
+    deleteMany: vi.fn(
+      async ({
+        where,
+      }: {
+        where: { userId: string; key: string; createdAt: Date };
+      }) => {
+        const k = `${where.userId}|${where.key}`;
+        const row = rows.get(k);
+        if (
+          row?.statusCode === null &&
+          row.createdAt.getTime() === where.createdAt.getTime()
+        ) {
+          rows.delete(k);
+          return { count: 1 };
+        }
+        return { count: 0 };
+      },
+    ),
   };
   return {
     prisma: { idempotencyKey } as unknown as PrismaService,
@@ -204,6 +233,7 @@ describe('IdempotencyInterceptor', () => {
       }),
       statusCode: null,
       response: null,
+      createdAt: new Date(),
     });
     const next = handler(() => of('never'));
     expect(await failure(run(interceptor, http().context, next))).toEqual({
@@ -211,6 +241,26 @@ describe('IdempotencyInterceptor', () => {
       code: 'IN_PROGRESS',
     });
     expect(next.handle).not.toHaveBeenCalled();
+  });
+
+  it('takes over a claim left unfinished by a crash', async () => {
+    const fake = fakePrisma();
+    const interceptor = new IdempotencyInterceptor(fake.prisma);
+    fake.rows.set(`${USER}|${KEY}`, {
+      userId: USER,
+      key: KEY,
+      route: '/inventory/grn/abc/post',
+      requestHash: requestHash('POST', '/inventory/grn/abc/post', {
+        lines: [{ itemId: 'i1', qty: 2 }],
+      }),
+      statusCode: null,
+      response: null,
+      createdAt: new Date(Date.now() - ABANDONED_AFTER_MS - 1000),
+    });
+    const next = handler(() => of({ ok: true }));
+    expect(await run(interceptor, http().context, next)).toEqual({ ok: true });
+    expect(next.handle).toHaveBeenCalledTimes(1);
+    expect(fake.rows.get(`${USER}|${KEY}`)?.statusCode).toBe(201);
   });
 
   it('answers 422 when the key is reused for a different body or route', async () => {

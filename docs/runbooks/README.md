@@ -10,7 +10,7 @@ One page per kind of incident. Each page has the same four parts: symptoms, conf
 | [email-and-files.md](email-and-files.md) | Resend or R2 errors: no emails, uploads or PDFs fail            |
 | [bad-deploy.md](bad-deploy.md)           | Things broke right after a deploy                               |
 | [tls-dns.md](tls-dns.md)                 | Certificate warnings, the domain doesn't resolve                |
-| [restore.md](restore.md)                 | Restoring a backup, and the monthly restore drill               |
+| [restore.md](restore.md)                 | Recovering a lost server or wrong data, and the restore drill   |
 | [secret-rotation.md](secret-rotation.md) | A secret leaked, someone left, or a yearly rotation             |
 
 After any incident users noticed, add a short entry to [incidents.md](../incidents.md).
