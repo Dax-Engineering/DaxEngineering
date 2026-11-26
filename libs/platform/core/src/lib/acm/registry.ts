@@ -217,6 +217,7 @@ export async function syncRegistry(
         locked: meta.locked ?? false,
         writable: meta.writable ?? false,
         group: meta.group ?? null,
+        unlockedBy: meta.unlockedBy ?? null,
         filterable: meta.filterable ?? false,
         sortable: meta.sortable ?? false,
       };

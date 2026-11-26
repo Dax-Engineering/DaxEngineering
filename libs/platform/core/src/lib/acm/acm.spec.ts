@@ -227,6 +227,45 @@ describe('resolvePolicy', () => {
     expect(p.fields.get(entity.key)?.write.has('phone')).toBe(false);
   });
 
+  it('opens a field to holders of its unlocking permission', () => {
+    const unlocked = fields.map((f) =>
+      f.name === 'phone' ? { ...f, unlockedBy: 'inventory.thing.edit' } : f,
+    );
+    const holder = policyFor({
+      catalog: { permissions, fields: unlocked },
+      roles: [
+        role({
+          permissions: [
+            { key: 'inventory.thing.edit', scope: 'ALL', storeIds: [] },
+          ],
+        }),
+      ],
+    });
+    expect(holder.fields.get(entity.key)?.read.has('phone')).toBe(true);
+    expect(holder.fields.get(entity.key)?.write.has('phone')).toBe(true);
+    expect(holder.fields.get(entity.key)?.read.has('cost')).toBe(false);
+
+    const denied = policyFor({
+      catalog: { permissions, fields: unlocked },
+      roles: [
+        role({
+          permissions: [
+            { key: 'inventory.thing.edit', scope: 'ALL', storeIds: [] },
+          ],
+        }),
+      ],
+      overrides: [
+        {
+          permissionKey: 'inventory.thing.edit',
+          effect: 'DENY',
+          scope: null,
+          expiresAt: null,
+        },
+      ],
+    });
+    expect(denied.fields.get(entity.key)?.read.has('phone')).toBe(false);
+  });
+
   it('gives super admins everything and requires 2FA', () => {
     const p = policyFor({ roles: [role({ isSuperAdmin: true })] });
     expect(p.isSuperAdmin).toBe(true);
@@ -311,6 +350,24 @@ describe('visibility', () => {
 });
 
 describe('entity definitions', () => {
+  it('only lets a field be unlocked by its own module', () => {
+    expect(() =>
+      defineEntity({
+        key: 'inventory.x',
+        moduleKey: 'inventory',
+        label: 'X',
+        table: 'inventory.x',
+        fields: {
+          phone: {
+            label: 'Phone',
+            tier: 'CONFIDENTIAL',
+            unlockedBy: 'parties.customer.contact_details',
+          },
+        },
+      }),
+    ).toThrow(EntityError);
+  });
+
   it('rejects encrypted non-Restricted fields', () => {
     expect(() =>
       defineEntity({

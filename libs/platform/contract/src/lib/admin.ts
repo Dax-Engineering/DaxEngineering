@@ -24,6 +24,8 @@ export const CatalogField = z.object({
   writable: z.boolean(),
   encrypted: z.boolean(),
   group: z.string().nullable(),
+  /** Holders of this permission can read and write the field whatever the grid says. */
+  unlockedBy: z.string().nullable().optional(),
 });
 export const AdminCatalog = z.object({
   modules: z.array(

@@ -38,6 +38,17 @@ export function GrantsEditor({
     fieldState(entities, role.fieldGrants),
   );
   const [state, dispatch, pending] = useActionState(save, { ok: false });
+  const permissionLabels = useMemo(
+    () =>
+      new Map(
+        modules.flatMap((m) =>
+          m.features.flatMap((f) =>
+            f.actions.map((a) => [a.permissionKey, a.label] as const),
+          ),
+        ),
+      ),
+    [modules],
+  );
 
   const saved = useMemo(
     () =>
@@ -73,6 +84,7 @@ export function GrantsEditor({
         fields={fields}
         setFields={setFields}
         readOnly={readOnly}
+        permissionLabels={permissionLabels}
       />
       {readOnly ? null : (
         <Paper shadow="xl" p="md" pos="sticky" bottom={0} style={{ zIndex: 2 }}>

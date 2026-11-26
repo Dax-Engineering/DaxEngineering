@@ -39,7 +39,7 @@ export const AOD_STATUSES = [
 ] as const;
 
 export const HoldInput = z.strictObject({
-  departmentId: z.uuid(),
+  departmentId: z.uuid('Choose a department'),
   customerId: z.uuid().nullable().optional(),
   reason: OptionalText(300),
   lines: z
@@ -91,7 +91,7 @@ export type HoldQuery = z.infer<typeof HoldQuery>;
 
 const mrnHeader = {
   subtype: z.enum(MRN_SUBTYPES),
-  departmentId: z.uuid(),
+  departmentId: z.uuid('Choose a department'),
   customerId: z.uuid().nullable().optional(),
   jobNumber: OptionalText(40),
   customerPo: OptionalText(40),

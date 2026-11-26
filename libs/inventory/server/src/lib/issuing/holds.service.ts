@@ -169,7 +169,12 @@ export class HoldsService {
       input.lines.map((l) => l.itemId),
     );
     input.lines.forEach((line, i) => {
-      const item = requireItem(items, line.itemId, `lines.${i}.itemId`, true);
+      const item = requireItem(
+        items,
+        line.itemId,
+        `lines.${i}.itemId`,
+        'issue',
+      );
       checkQty(item, line.qty, `lines.${i}.qty`);
     });
     const partNo = (itemId: string) => items.get(itemId)?.partNo ?? 'this item';

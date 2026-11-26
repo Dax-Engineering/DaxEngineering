@@ -1,22 +1,50 @@
 import { ITEM_CSV_COLUMNS } from '@dax/inventory-contract';
-import { PageHead } from '@dax/web-shell';
+import { canDo, PageHead } from '@dax/web-shell';
 import { ImportScreen } from '../../../../../components/import-screen';
 import { requirePermission } from '../../../../../lib/server';
 
 export default async function ImportItemsPage() {
-  await requirePermission('inventory.item.import');
+  const caps = await requirePermission('inventory.item.import');
+  const canUpdate = canDo(caps, 'inventory.item.edit');
   return (
     <>
       <PageHead
         back={{ href: '/inventory/stock', label: 'Stock' }}
         title="Import items"
-        lede="Add or update many items at once from a CSV file."
+        lede={
+          canUpdate
+            ? 'Add many parts at once from a CSV file, or update parts you already have.'
+            : 'Add many parts at once from a CSV file.'
+        }
       />
       <ImportScreen
         kind="items"
-        noun="item"
+        noun="part"
         columns={ITEM_CSV_COLUMNS}
         backHref="/inventory/stock"
+        modes={[
+          {
+            value: 'add',
+            label: 'Add new parts only',
+            notes: [
+              'A row whose part number and brand already exist is refused.',
+            ],
+          },
+          ...(canUpdate
+            ? [
+                {
+                  value: 'upsert' as const,
+                  label: 'Add new parts and update existing ones',
+                  notes: [
+                    'A row whose part number and brand already exist updates that part. Other rows are added as new parts.',
+                    'When updating, a blank cell leaves that value as it is; it never clears it.',
+                    'machine_models and tags replace the current list when filled in. Barcodes are added to the part; its other barcodes stay.',
+                    'Stock, supersession and archive status are never changed. Archived parts cannot be updated.',
+                  ],
+                },
+              ]
+            : []),
+        ]}
         notes={[
           'Brands, machine models and bins must already exist; use the same names and codes as in the app.',
           'uom is a unit code such as PCS, SET, L or KG.',

@@ -194,9 +194,9 @@ export type ItemDetail = z.infer<typeof ItemDetail>;
 
 const itemFields = {
   partNo: z.string().trim().min(1).max(60),
-  brandId: z.uuid(),
+  brandId: z.uuid('Choose a brand'),
   description: z.string().trim().min(1).max(200),
-  uom: z.enum(UOM_CODES),
+  uom: z.enum(UOM_CODES, 'Choose a unit'),
   minQty: Qty,
   defaultBinId: z.uuid().nullable(),
   machineModelIds: z.array(z.uuid()).max(50),
@@ -234,8 +234,9 @@ export const BarcodeInput = z.strictObject({
   code: z
     .string()
     .trim()
-    .min(3)
-    .max(64)
+    .min(1, 'Scan or type the barcode')
+    .min(3, 'A barcode has at least 3 characters')
+    .max(64, 'A barcode has at most 64 characters')
     // Plain characters; spaces are fine between them (e.g. "P31667701 AA").
     .regex(
       /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/,
@@ -323,7 +324,7 @@ export const BinQuery = PageQuery.extend({
 });
 export type BinQuery = z.infer<typeof BinQuery>;
 export const BinInput = z.strictObject({
-  zoneId: z.uuid(),
+  zoneId: z.uuid('Choose a zone'),
   rack: z.string().trim().regex(BIN_PART.rack, 'Rack number, e.g. 1 or 01'),
   shelf: z.string().trim().regex(BIN_PART.shelf, 'Shelf number, e.g. 3'),
   position: z
@@ -344,7 +345,7 @@ export const BinUpdate = z.strictObject({
 export type BinUpdate = z.infer<typeof BinUpdate>;
 export const BinBulkInput = z
   .strictObject({
-    zoneId: z.uuid(),
+    zoneId: z.uuid('Choose a zone'),
     racks: z.object({
       from: z.int().min(1).max(999),
       to: z.int().min(1).max(999),
@@ -502,6 +503,9 @@ export type ItemStatusInput = z.infer<typeof ItemStatusInput>;
 
 export const SPECIAL_ZONE_CODE = 'X';
 export const ITEM_CSV_MAX_ROWS = 5000;
+/** `add` refuses parts that already exist; `upsert` updates them (blank cells keep the current value). */
+export const ITEM_IMPORT_MODES = ['add', 'upsert'] as const;
+export type ItemImportMode = (typeof ITEM_IMPORT_MODES)[number];
 export const ITEM_CSV_MAX_BYTES = 2 * 1024 * 1024;
 /** The code in a part or bin label's Code 128 barcode. */
 export const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9]{12}$/;

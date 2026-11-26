@@ -3,6 +3,7 @@ import {
   BarcodeInput,
   ITEM_CSV_COLUMNS,
   ITEM_CSV_MAX_ROWS,
+  type ItemImportMode,
   ItemInput,
   MAX_TAGS,
   normalizePartNo,
@@ -23,13 +24,33 @@ const OPTIONAL_COLUMNS: readonly Column[] = [
 ];
 export type ImportError = ImportResult['errors'][number];
 
+/** An item the file may update, with the values its blank cells keep. */
+export interface ExistingItem {
+  id: string;
+  version: number;
+  partNo: string;
+  archived: boolean;
+  description: string;
+  uom: string;
+  minQty: string;
+  defaultBinId: string | null;
+  notes: string | null;
+  supplierId: string | null;
+  tags: string[];
+  preCostPrice: string | null;
+  sellingPrice: string | null;
+  machineModelIds: string[];
+  barcodes: string[];
+}
+
 export interface ImportLookups {
   brands: ReadonlyMap<string, { id: string; active: boolean }>;
   machineModels: ReadonlyMap<string, { id: string }>;
   suppliers: ReadonlyMap<string, { id: string; name: string; active: boolean }>;
   storageBins: ReadonlyMap<string, { id: string }>;
-  existingItems: ReadonlySet<string>;
-  barcodesInUse: ReadonlySet<string>;
+  existingItems: ReadonlyMap<string, ExistingItem>;
+  /** Barcode → the part number it is on. */
+  barcodesInUse: ReadonlyMap<string, string>;
 }
 
 export interface ImportRow {
@@ -67,6 +88,34 @@ export interface ValidItem {
   tags: string[];
   preCostPrice: string | null;
   sellingPrice: string | null;
+}
+
+export interface ItemChanges {
+  description?: string;
+  uom?: string;
+  allowFraction?: boolean;
+  minQty?: string;
+  defaultBinId?: string;
+  notes?: string;
+  supplier?: { id: string; name: string };
+  tags?: string[];
+  preCostPrice?: string;
+  sellingPrice?: string;
+}
+
+/** An existing item the file changes; only changed fields are set. */
+export interface ValidUpdate {
+  row: number;
+  existing: ExistingItem;
+  changes: ItemChanges;
+  machineModelIds?: string[];
+  addBarcodes: string[];
+}
+
+export interface ValidatedImport {
+  items: ValidItem[];
+  updates: ValidUpdate[];
+  errors: ImportError[];
 }
 
 export const itemKey = (brandId: string, partNoNorm: string) =>
@@ -164,7 +213,7 @@ export function readItemCsv(text: string): ReadResult {
       brandName: cell('brand'),
       description: cell('description'),
       uom: cell('uom').toUpperCase(),
-      minQty: cell('min_qty') || '0',
+      minQty: cell('min_qty'),
       defaultBinCode: cell('default_bin').toUpperCase(),
       machineModelNames: list(cell('machine_models')),
       barcodes: list(cell('barcodes')),
@@ -178,12 +227,63 @@ export function readItemCsv(text: string): ReadResult {
   return { ok: true, rows };
 }
 
+const sameNumber = (a: string | null, b: string | null) =>
+  a === null || b === null ? a === b : Number(a) === Number(b);
+
+type ItemValues = Omit<ValidItem, 'row' | 'partNo' | 'partNoNorm' | 'brandId'>;
+
+function changesOf(
+  existing: ExistingItem,
+  next: ItemValues,
+): Omit<ValidUpdate, 'row' | 'existing'> {
+  const changes: ItemChanges = {};
+  if (next.description !== existing.description)
+    changes.description = next.description;
+  if (next.uom !== existing.uom) {
+    changes.uom = next.uom;
+    changes.allowFraction = next.allowFraction;
+  }
+  if (!sameNumber(next.minQty, existing.minQty)) changes.minQty = next.minQty;
+  if (next.defaultBinId && next.defaultBinId !== existing.defaultBinId)
+    changes.defaultBinId = next.defaultBinId;
+  if (next.notes && next.notes !== existing.notes) changes.notes = next.notes;
+  if (next.supplier && next.supplier.id !== existing.supplierId)
+    changes.supplier = next.supplier;
+  if (next.tags.length && next.tags.join('|') !== existing.tags.join('|'))
+    changes.tags = next.tags;
+  if (
+    next.preCostPrice &&
+    !sameNumber(next.preCostPrice, existing.preCostPrice)
+  )
+    changes.preCostPrice = next.preCostPrice;
+  if (
+    next.sellingPrice &&
+    !sameNumber(next.sellingPrice, existing.sellingPrice)
+  )
+    changes.sellingPrice = next.sellingPrice;
+  const models =
+    next.machineModelIds.length > 0 &&
+    [...next.machineModelIds].sort().join() !==
+      [...existing.machineModelIds].sort().join();
+  return {
+    changes,
+    ...(models ? { machineModelIds: next.machineModelIds } : {}),
+    addBarcodes: next.barcodes.filter((c) => !existing.barcodes.includes(c)),
+  };
+}
+
+/**
+ * In `upsert` mode a row whose brand and part number already exist updates
+ * that item; its blank cells keep the current values.
+ */
 export function validateImport(
   rows: readonly ImportRow[],
   lookups: ImportLookups,
-): { items: ValidItem[]; errors: ImportError[] } {
+  mode: ItemImportMode = 'add',
+): ValidatedImport {
   const errors: ImportError[] = [];
   const items: ValidItem[] = [];
+  const updates: ValidUpdate[] = [];
   const seenItems = new Map<string, number>();
   const seenBarcodes = new Map<string, number>();
 
@@ -192,11 +292,18 @@ export function validateImport(
       errors.push({ row: r.row, field, message });
     const before = errors.length;
 
+    const brand = r.brandName
+      ? lookups.brands.get(nameKey(r.brandName))
+      : undefined;
+    const key = brand && r.partNoNorm ? itemKey(brand.id, r.partNoNorm) : null;
+    const found = key ? lookups.existingItems.get(key) : undefined;
+    const existing = mode === 'upsert' ? found : undefined;
+
     const parsed = RowFields.safeParse({
       partNo: r.partNo,
-      description: r.description,
-      uom: r.uom,
-      minQty: r.minQty,
+      description: r.description || existing?.description || '',
+      uom: r.uom || existing?.uom || '',
+      minQty: r.minQty || existing?.minQty || '0',
       notes: r.notes ?? undefined,
     });
     if (!parsed.success) {
@@ -212,16 +319,20 @@ export function validateImport(
       fail('part_no', 'The part number needs at least one letter or digit.');
     }
 
-    const brand = r.brandName
-      ? lookups.brands.get(nameKey(r.brandName))
-      : undefined;
     if (!r.brandName) fail('brand', 'Brand is required.');
     else if (!brand) fail('brand', `Unknown brand "${r.brandName}".`);
-    else if (!brand.active)
+    else if (!brand.active && !existing)
       fail('brand', `Brand "${r.brandName}" is inactive.`);
 
-    const uom = UOMS.find((u) => u.code === r.uom);
-    if (uom && parsed.success && !uom.fraction && !isWhole(r.minQty)) {
+    const uom = parsed.success
+      ? UOMS.find((u) => u.code === parsed.data.uom)
+      : undefined;
+    if (
+      uom &&
+      parsed.success &&
+      !uom.fraction &&
+      !isWhole(parsed.data.minQty)
+    ) {
       fail(
         'min_qty',
         `Minimum quantity must be a whole number for ${uom.code}.`,
@@ -247,10 +358,14 @@ export function validateImport(
 
     const codes = [...new Set(r.barcodes)];
     for (const code of codes) {
+      const usedOn = lookups.barcodesInUse.get(code);
       if (!BarcodeInput.shape.code.safeParse(code).success) {
         fail('barcodes', `Barcode "${code}" is not valid.`);
-      } else if (lookups.barcodesInUse.has(code)) {
-        fail('barcodes', `Barcode "${code}" is already used by another item.`);
+      } else if (usedOn !== undefined && !existing?.barcodes.includes(code)) {
+        fail(
+          'barcodes',
+          `Barcode "${code}" is already on another part: ${usedOn}.`,
+        );
       } else if (seenBarcodes.has(code)) {
         fail(
           'barcodes',
@@ -295,10 +410,14 @@ export function validateImport(
       'Selling price',
     );
 
-    if (brand && r.partNoNorm) {
-      const key = itemKey(brand.id, r.partNoNorm);
-      if (lookups.existingItems.has(key)) {
+    if (key) {
+      if (found && mode === 'add') {
         fail('part_no', 'This part number already exists for this brand.');
+      } else if (existing?.archived) {
+        fail(
+          'part_no',
+          'This part is archived. Restore it before updating it from a file.',
+        );
       } else if (seenItems.has(key)) {
         fail('part_no', `Duplicate of row ${seenItems.get(key)}.`);
       } else {
@@ -309,11 +428,7 @@ export function validateImport(
       if (!seenBarcodes.has(code)) seenBarcodes.set(code, r.row);
 
     if (errors.length > before || !parsed.success || !brand || !uom) continue;
-    items.push({
-      row: r.row,
-      partNo: parsed.data.partNo,
-      partNoNorm: r.partNoNorm,
-      brandId: brand.id,
+    const values: ItemValues = {
       description: parsed.data.description,
       uom: uom.code,
       allowFraction: uom.fraction,
@@ -326,7 +441,25 @@ export function validateImport(
       tags,
       preCostPrice,
       sellingPrice,
+    };
+    if (existing) {
+      const update = changesOf(existing, values);
+      if (
+        Object.keys(update.changes).length ||
+        update.machineModelIds ||
+        update.addBarcodes.length
+      ) {
+        updates.push({ row: r.row, existing, ...update });
+      }
+      continue;
+    }
+    items.push({
+      row: r.row,
+      partNo: parsed.data.partNo,
+      partNoNorm: r.partNoNorm,
+      brandId: brand.id,
+      ...values,
     });
   }
-  return { items, errors };
+  return { items, updates, errors };
 }

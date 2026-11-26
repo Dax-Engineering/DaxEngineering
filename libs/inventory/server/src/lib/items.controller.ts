@@ -18,6 +18,7 @@ import {
   BarcodeInput,
   ITEM_CSV_COLUMNS,
   ITEM_CSV_MAX_BYTES,
+  ITEM_IMPORT_MODES,
   type ItemDetail,
   type ItemFacets,
   ItemInput,
@@ -35,6 +36,7 @@ import { CSV_TYPES, readTextBody } from './text-body';
 
 const ImportQuery = z.object({
   dryRun: z.enum(['true', 'false']).default('true'),
+  mode: z.enum(ITEM_IMPORT_MODES).default('add'),
 });
 
 function bodyKeys(body: unknown): Set<string> {
@@ -80,12 +82,17 @@ export class ItemsController {
     @Req() req: DaxRequest,
     @Query() query: unknown,
   ): Promise<ImportResult> {
-    const { dryRun } = parse(ImportQuery, query);
+    const { dryRun, mode } = parse(ImportQuery, query);
     const text = await readTextBody(req, {
       limit: ITEM_CSV_MAX_BYTES,
       types: CSV_TYPES,
     });
-    return this.items.import(sessionOf(req).policy, text, dryRun === 'true');
+    return this.items.import(
+      sessionOf(req).policy,
+      text,
+      dryRun === 'true',
+      mode,
+    );
   }
 
   @Get(':id')

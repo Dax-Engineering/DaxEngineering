@@ -49,7 +49,7 @@ export const MOVEMENT_TYPES = [
 ] as const;
 
 export const GrnCreate = z.strictObject({
-  supplierId: z.uuid(),
+  supplierId: z.uuid('Choose a supplier'),
   deliveryNote: OptionalText(60),
   deliveryDate: IsoDay.nullable().optional(),
 });

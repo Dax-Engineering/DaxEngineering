@@ -148,6 +148,7 @@ export class AdminSettingsController {
           writable: f.writable,
           encrypted: f.encrypted,
           group: f.group,
+          unlockedBy: f.unlockedBy,
         })),
       })),
     };
