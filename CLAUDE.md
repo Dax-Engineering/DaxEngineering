@@ -28,7 +28,7 @@ Phase 1 is Stores / Inventory only; other modules plug in later. Read `docs/arch
 - Every database column gets a tier: Internal / Confidential / Restricted. Hidden fields are never selected and never sent.
 - Phase 1 stores no money (cost, value) except each item's pre-costing and selling price (plain Internal item fields, DAX's decision). Other money belongs to a later module with its own restricted schema.
 - Never log request bodies, cookies, tokens or Restricted values.
-- Secrets live in Dokploy environment settings, never in git. `.env` is for local dev only.
+- Secrets live in Coolify environment settings, never in git. `.env` is for local dev only.
 
 ## Product copy
 

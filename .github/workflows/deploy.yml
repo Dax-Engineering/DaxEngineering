@@ -38,6 +38,12 @@ jobs:
               app: '',
             }
           - {
+              name: dax-postgres,
+              file: infra/docker/postgres.Dockerfile,
+              target: '',
+              app: '',
+            }
+          - {
               name: dax-web,
               file: infra/docker/next.Dockerfile,
               target: runtime,
@@ -75,10 +81,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'staging' }}
     steps:
-      - name: Trigger Dokploy deployment
+      - name: Trigger Coolify deployment
         env:
-          WEBHOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}
+          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_RESOURCE_UUID: ${{ secrets.COOLIFY_RESOURCE_UUID }}
         run: |
-          test -n "$WEBHOOK" || { echo "DOKPLOY_DEPLOY_WEBHOOK is not set for this environment"; exit 1; }
-          curl -fsS -X POST "$WEBHOOK" -H 'Content-Type: application/json' \
-            -d "{\"ref\":\"${GITHUB_SHA}\"}"
+          for name in COOLIFY_URL COOLIFY_TOKEN COOLIFY_RESOURCE_UUID; do
+            test -n "${!name}" || { echo "$name is not set for this environment"; exit 1; }
+          done
+          curl -fsS -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "${COOLIFY_URL%/}/api/v1/deploy?uuid=${COOLIFY_RESOURCE_UUID}&force=false"
