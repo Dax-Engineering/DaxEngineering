@@ -189,7 +189,12 @@ export async function seedDocuments(
       qty: l.item.partNo === 'ELC-50' ? '100' : '20',
     })),
   });
-  summary.push(`GRN ${grn.number}: received and put away`);
+  // Its labels have been printed and stuck on, like a real delivery.
+  await prisma.itemSerial.updateMany({
+    where: { docId: grn.id },
+    data: { printCount: 1, lastPrintedAt: new Date() },
+  });
+  summary.push(`GRN ${grn.number}: received, put away, serial labels printed`);
 
   // 2. Posted, still in the receiving bin; one short and one damaged, so it
   //    also opens two discrepancies.
@@ -320,6 +325,44 @@ export async function seedDocuments(
     vehicleNo: 'WP LK-4471',
   });
   summary.push(`MRN ${mrn.number}: AOD being picked`);
+
+  // Picked and sent for approval: waits for the department head.
+  mrn = await submitAndCheck(
+    await newMrn('SAL', 'Ceylon Power Rentals', 'JOB-2611-031', [
+      ['AF25139M', '2'],
+      ['22216 E', '1'],
+    ]),
+  );
+  const pending = await aods.create(keeper, {
+    mrnId: mrn.id,
+    type: 'DIR',
+    deliverTo: 'Ceylon Power Rentals, Peliyagoda',
+    vehicleNo: 'WP CAB-1190',
+  });
+  await aods.submit(keeper, pending.id, pending.version);
+  summary.push(`MRN ${mrn.number}: AOD awaiting department head approval`);
+
+  // Sent back by the approver; Stores fixes it and sends it again.
+  mrn = await submitAndCheck(
+    await newMrn('SRV', 'Southern Quarry Works', 'JOB-2611-032', [
+      ['247-1565', '1'],
+      ['6754-11-3100', '2'],
+    ]),
+  );
+  const toReject = await aods.create(keeper, {
+    mrnId: mrn.id,
+    type: 'BRK',
+    deliverTo: 'Southern Quarry Works, crusher site',
+    vehicleNo: 'SP LB-3307',
+  });
+  const sentBack = await aods.submit(keeper, toReject.id, toReject.version);
+  await aods.reject(keeper, toReject.id, {
+    version: sentBack.version,
+    reason: 'Vehicle number is wrong; correct it and send again.',
+  });
+  summary.push(
+    `MRN ${mrn.number}: AOD rejected by the approver, back with Stores`,
+  );
 
   // Issued, waiting for the signed copy.
   mrn = await submitAndCheck(

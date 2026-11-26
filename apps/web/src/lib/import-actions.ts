@@ -24,7 +24,7 @@ const PERMISSION: Record<ImportKind, string> = {
 const LIST_PATH: Record<ImportKind, string> = {
   customers: '/parties/customers',
   suppliers: '/parties/suppliers',
-  items: '/inventory/items',
+  items: '/inventory/stock',
 };
 
 export async function runImport(

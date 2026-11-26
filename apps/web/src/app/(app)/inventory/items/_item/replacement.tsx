@@ -17,6 +17,14 @@ export function Replacement({
 }) {
   const [state, dispatch, pending] = useActionState(setReplacement, IDLE);
   const [choice, setChoice] = useState<string | null>(null);
+  // Clear the picker once a save or remove lands, so it doesn't keep
+  // offering the number that is now linked (or was just removed).
+  const linked = item.supersededBy?.id ?? '';
+  const [seenLink, setSeenLink] = useState(linked);
+  if (seenLink !== linked) {
+    setSeenLink(linked);
+    setChoice(null);
+  }
   const save = (replacementId: string | null) =>
     startTransition(() =>
       dispatch({ id: item.id, version: item.version, replacementId }),
@@ -67,6 +75,7 @@ export function Replacement({
       {canEdit ? (
         <Group align="flex-end" gap="sm" wrap="wrap">
           <ItemPicker
+            key={linked}
             label={
               item.supersededBy ? 'Change superseding number' : 'Superseded by'
             }

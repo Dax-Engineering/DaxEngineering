@@ -8,7 +8,7 @@ export default async function ImportItemsPage() {
   return (
     <>
       <PageHead
-        back={{ href: '/inventory/items', label: 'Items' }}
+        back={{ href: '/inventory/stock', label: 'Stock' }}
         title="Import items"
         lede="Add or update many items at once from a CSV file."
       />
@@ -16,7 +16,7 @@ export default async function ImportItemsPage() {
         kind="items"
         noun="item"
         columns={ITEM_CSV_COLUMNS}
-        backHref="/inventory/items"
+        backHref="/inventory/stock"
         notes={[
           'Brands, machine models and bins must already exist; use the same names and codes as in the app.',
           'uom is a unit code such as PCS, SET, L or KG.',

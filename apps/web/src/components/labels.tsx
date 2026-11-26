@@ -233,5 +233,5 @@ export function SelectAllCheckbox({ ids }: { ids: string[] }) {
 
 export function SelectionHint({ children }: { children: ReactNode }) {
   const { enabled } = useContext(SelectionContext);
-  return enabled ? <span className="dax-sub">{children}</span> : null;
+  return enabled ? <span>{children}</span> : null;
 }

@@ -200,13 +200,6 @@ export const inventoryManifest = defineModule({
       icon: 'boxes',
     },
     {
-      key: 'inventory.items',
-      label: 'Items',
-      path: '/inventory/items',
-      permission: 'inventory.item.view',
-      icon: 'tag',
-    },
-    {
       key: 'inventory.locations',
       label: 'Bins',
       path: '/inventory/locations',
