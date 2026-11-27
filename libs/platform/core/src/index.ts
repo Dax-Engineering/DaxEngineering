@@ -24,3 +24,4 @@ export * from './lib/inbox';
 export * from './lib/logging';
 export * from './lib/numbering/numbering.service';
 export * from './lib/platform.module';
+export * from './lib/throttle/throttle';

@@ -5,6 +5,8 @@ import { HandlerRegistry, type ScheduledJob } from './handler-registry';
 
 export type JobOutcome = 'ran' | 'busy' | 'not-due' | 'failed';
 
+export const WORKER_HEARTBEAT_JOB = 'worker.heartbeat';
+
 @Injectable()
 export class JobRunner {
   private readonly logger = new Logger('Jobs');
@@ -22,6 +24,15 @@ export class JobRunner {
       outcomes[job.name] = await this.runIfDue(job, new Date(now));
     }
     return outcomes;
+  }
+
+  async recordHeartbeat(now = new Date()): Promise<void> {
+    const record = { lastRunAt: now, lastStatus: 'OK', lastError: null };
+    await this.prisma.jobRun.upsert({
+      where: { name: WORKER_HEARTBEAT_JOB },
+      create: { name: WORKER_HEARTBEAT_JOB, ...record },
+      update: record,
+    });
   }
 
   async runIfDue(job: ScheduledJob, now: Date): Promise<JobOutcome> {

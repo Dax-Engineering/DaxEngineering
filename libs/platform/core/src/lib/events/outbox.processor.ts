@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { captureMessage } from '@sentry/nestjs';
 import { OutboxStatus, PrismaService } from '@dax/platform-db';
 import {
   errorMessage,
@@ -144,8 +145,15 @@ export class OutboxProcessor {
       attempts,
       error: lastError,
     };
-    if (failed) this.logger.error(log, 'Event delivery failed for good');
-    else this.logger.warn(log, 'Event delivery failed, will retry');
+    if (failed) {
+      this.logger.error(log, 'Event delivery failed for good');
+      captureMessage('Event delivery failed for good', {
+        level: 'error',
+        tags: { event: row.name },
+        extra: { eventId: row.id, attempts },
+        fingerprint: ['outbox-failed', row.name],
+      });
+    } else this.logger.warn(log, 'Event delivery failed, will retry');
     return failed ? 'failed' : 'retried';
   }
 }

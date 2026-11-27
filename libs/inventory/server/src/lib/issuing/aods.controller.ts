@@ -21,7 +21,12 @@ import {
   AodTransition,
   AodUpdate,
 } from '@dax/inventory-contract';
-import { type DaxRequest, Requires, sessionOf } from '@dax/platform-core';
+import {
+  type DaxRequest,
+  RateLimit,
+  Requires,
+  sessionOf,
+} from '@dax/platform-core';
 import { parse } from '../common';
 import { AodsService } from './aods.service';
 
@@ -45,6 +50,7 @@ export class AodsController {
   }
 
   @Get(':id/pdf')
+  @RateLimit(30)
   @Requires('inventory.aod.print')
   @Header('Cache-Control', 'no-store')
   async pdf(

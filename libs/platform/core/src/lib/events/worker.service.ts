@@ -10,12 +10,15 @@ import { JobRunner } from './job.runner';
 import { OutboxProcessor } from './outbox.processor';
 import { WORKER_OPTIONS, type WorkerSettings } from './worker.options';
 
+export const DB_HEARTBEAT_EVERY_MS = 30_000;
+
 @Injectable()
 export class WorkerService implements OnModuleDestroy {
   private readonly logger = new Logger('Worker');
   private loop: Promise<void> | null = null;
   private stopping = false;
   private wake: (() => void) | null = null;
+  private lastDbHeartbeat = 0;
 
   constructor(
     private readonly outbox: OutboxProcessor,
@@ -84,7 +87,12 @@ export class WorkerService implements OnModuleDestroy {
   }
 
   private async heartbeat(): Promise<void> {
-    if (!this.options.heartbeatFile) return;
-    await writeFile(this.options.heartbeatFile, String(Date.now()));
+    const now = Date.now();
+    if (this.options.heartbeatFile) {
+      await writeFile(this.options.heartbeatFile, String(now));
+    }
+    if (now - this.lastDbHeartbeat < DB_HEARTBEAT_EVERY_MS) return;
+    await this.jobs.recordHeartbeat(new Date(now));
+    this.lastDbHeartbeat = now;
   }
 }

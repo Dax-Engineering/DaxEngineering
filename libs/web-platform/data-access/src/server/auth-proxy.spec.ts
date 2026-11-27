@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 const { createAuthProxy, isAllowedAuthPath, isSameOrigin, sanitizeAuthBody } =
   await import('./auth-proxy');
-const { appCookies, clientIp, readServerConfig } = await import('./config');
+const { appCookies, clientIp, readServerConfig, requestId } =
+  await import('./config');
 const { buildCsp } = await import('./csp');
 
 const ORIGIN = 'https://app.example.test';
@@ -19,7 +20,7 @@ function post(path: string, init: { origin?: string; cookie?: string } = {}) {
       origin: init.origin ?? ORIGIN,
       cookie: init.cookie ?? '',
       'content-type': 'application/json',
-      'x-forwarded-for': '203.0.113.9, 10.0.0.2',
+      'x-forwarded-for': '10.9.9.9, 203.0.113.9',
     },
     body: JSON.stringify({ username: 'kasun', password: 'x' }),
   });
@@ -85,11 +86,35 @@ describe('cookies and client ip', () => {
     expect(appCookies('web', null)).toBe('');
   });
 
-  it('takes the first forwarded address', () => {
+  it('prefers the proxy-set real IP', () => {
     expect(
-      clientIp(new Headers({ 'x-forwarded-for': '203.0.113.9, 10.0.0.2' })),
-    ).toBe('203.0.113.9');
+      clientIp(
+        new Headers({
+          'x-real-ip': '198.51.100.7',
+          'x-forwarded-for': '203.0.113.9, 198.51.100.7',
+        }),
+      ),
+    ).toBe('198.51.100.7');
     expect(clientIp(new Headers())).toBeNull();
+  });
+
+  it('ignores a spoofed leftmost forwarded address', () => {
+    expect(
+      clientIp(new Headers({ 'x-forwarded-for': '1.2.3.4, 198.51.100.7' })),
+    ).toBe('198.51.100.7');
+    expect(clientIp(new Headers({ 'x-forwarded-for': '198.51.100.7' }))).toBe(
+      '198.51.100.7',
+    );
+  });
+
+  it('reuses a well-formed request id and replaces anything else', () => {
+    expect(requestId(new Headers({ 'x-request-id': 'abc-12345678' }))).toBe(
+      'abc-12345678',
+    );
+    expect(requestId(new Headers({ 'x-request-id': 'no spaces!' }))).toMatch(
+      /^[0-9a-f-]{36}$/,
+    );
+    expect(requestId(new Headers())).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
 

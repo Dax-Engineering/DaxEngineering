@@ -47,6 +47,7 @@ import { type DaxRequest, internalCaller } from './auth/internal-caller';
 import { DirectoryController } from './auth/directory.controller';
 import { MeController } from './auth/me.controller';
 import { SessionGuard } from './auth/session.guard';
+import { DaxThrottlerGuard, rateLimitModule } from './throttle/throttle';
 
 export interface PlatformOptions {
   auth: AuthOptions;
@@ -77,13 +78,15 @@ export class PlatformModule {
             mount: true,
             generateId: true,
             idGenerator: (req: Request) => requestIdFor(req),
-            setup: (cls, req: Request) => {
+            setup: (cls, req: Request, res: Response) => {
               const ip = req.headers['x-dax-client-ip'];
+              res.setHeader('x-request-id', cls.getId());
               cls.set('requestId', cls.getId());
               cls.set('ip', typeof ip === 'string' ? ip : null);
             },
           },
         }),
+        rateLimitModule(),
       ],
       providers: [
         { provide: AUTH_OPTIONS, useValue: options.auth },
@@ -101,6 +104,7 @@ export class PlatformModule {
         AuditService,
         RegistryService,
         AuthService,
+        { provide: APP_GUARD, useClass: DaxThrottlerGuard },
         { provide: APP_GUARD, useClass: SessionGuard },
         { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
         fieldCryptoProvider(options.crypto),

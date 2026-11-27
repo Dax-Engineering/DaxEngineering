@@ -1,4 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 import {
   type AuthOptions,
   createLoggerModule,
@@ -46,9 +48,11 @@ export function authOptions(env: Env): AuthOptions {
 @Module({})
 export class AppModule {
   static forRoot(env: Env, enabled: ReadonlySet<string>): DynamicModule {
+    const reporting = env.SENTRY_DSN !== undefined;
     return {
       module: AppModule,
       imports: [
+        ...(reporting ? [SentryModule.forRoot()] : []),
         createLoggerModule({
           level: env.LOG_LEVEL,
           pretty: env.NODE_ENV === 'development',
@@ -84,6 +88,9 @@ export class AppModule {
           .map(([, server]) => server),
       ],
       controllers: [HealthController],
+      providers: reporting
+        ? [{ provide: APP_FILTER, useClass: SentryGlobalFilter }]
+        : [],
     };
   }
 }

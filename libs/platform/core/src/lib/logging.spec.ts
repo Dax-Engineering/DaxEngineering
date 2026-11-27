@@ -18,3 +18,10 @@ describe('requestIdFor', () => {
     expect(requestIdFor(req('x'.repeat(200)))).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
+
+describe('requestIdFor on the same request', () => {
+  it('returns the same generated id every time', () => {
+    const one = req();
+    expect(requestIdFor(one)).toBe(requestIdFor(one));
+  });
+});

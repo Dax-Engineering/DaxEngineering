@@ -288,16 +288,36 @@ nightly reconcile then checks layers against shelf stock.
 
 ## Milestones
 
-| #   | Scope                                                                                                          | Status |
-| --- | -------------------------------------------------------------------------------------------------------------- | ------ |
-| M0  | Workspace, boundaries, Prisma layout, DB roles, logging, health, Docker, CI                                    | done   |
-| M1  | Better Auth in NestJS, Next auth proxy, login/2FA screens, internal tokens                                     | built  |
-| M2  | Registry, ACM, policy cache, visibility layer, audit, crypto, numbering, approvals, files, events, admin panel | built  |
-| M3  | Parties, items, bins, QR labels, stock views, scanner, PWA                                                     | built  |
-| M4  | Stock engine, receiving, GRN, put-away                                                                         | built  |
-| M5  | MRN, AOD, holds                                                                                                | built  |
-| M6  | Returns, counts, warranty bin, reports                                                                         | built  |
-| M7  | Hardening, backup drill, UAT, go-live                                                                          |        |
+| #   | Scope                                                                                                                                                                                                          | Status          |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| M0  | Workspace, boundaries, Prisma layout, DB roles, logging, health, Docker, CI                                                                                                                                    | done            |
+| M1  | Better Auth in NestJS, Next auth proxy, login/2FA screens, internal tokens                                                                                                                                     | built           |
+| M2  | Registry, ACM, policy cache, visibility layer, audit, crypto, numbering, approvals, files, events, admin panel                                                                                                 | built           |
+| M3  | Parties, items, bins, QR labels, stock views, scanner, PWA                                                                                                                                                     | built           |
+| M4  | Stock engine, receiving, GRN, put-away                                                                                                                                                                         | built           |
+| M5  | MRN, AOD, holds                                                                                                                                                                                                | built           |
+| M6  | Returns, counts, warranty bin, reports                                                                                                                                                                         | built           |
+| M7  | Hardening: encrypted nightly backups + restore drill, API rate limits, client IP fix, dependency and secret scanning, Sentry error tracking, deep health check, container limits, runbooks · then UAT, go-live | hardening built |
+
+## Decision notes
+
+- **2026-11-26, monitoring stack:** free hosted services only, nothing self-hosted. Sentry
+  (errors, tracing off, DSNs read at runtime so one image serves staging and production),
+  UptimeRobot (`/healthz/deep` and `/healthz`), Healthchecks.io (backup heartbeat) and Coolify's
+  own notifications. All alerts go by email. Metrics dashboards and central log search wait
+  until volume needs them; Coolify's container logs are enough for now.
+- **2026-11-26, backups:** nightly `pg_dump` as `dax_backup`, encrypted with age, to a separate
+  R2 bucket with lifecycle rules and a 14-day bucket lock; uploaded files are copied, never
+  synced. Up to a day of data can be lost; point-in-time recovery is the next step if that is
+  too much.
+- **2026-11-26, throttling:** `@nestjs/throttler` with in-memory storage (one API instance),
+  1,000 requests a minute per client IP, lower on phone pairing, phone scans, PDFs, CSV imports
+  and scan lookups; health routes are exempt. The client IP comes from `x-dax-client-ip`, which
+  only the Next apps (holding an internal token) can send; they take it from `X-Real-Ip`, else
+  the rightmost `X-Forwarded-For` entry, never the client-controlled leftmost one. Throttling is
+  on in development too: the limits are per minute and far above one developer's use, and no
+  test calls the API over HTTP. One office behind one public IP shares the 1,000; raise it if
+  that is ever hit. Traefik adds an edge limit (average 50/s, burst 100) per client.
 
 ## Open points to confirm with DAX
 

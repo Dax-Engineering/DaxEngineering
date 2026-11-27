@@ -10,10 +10,11 @@ import {
 } from '@nestjs/common';
 import { LabelRequest } from '@dax/inventory-contract';
 import {
-  Authenticated,
   AuditService,
+  Authenticated,
   can,
   type DaxRequest,
+  RateLimit,
   sessionOf,
 } from '@dax/platform-core';
 import { PrismaService } from '@dax/platform-db';
@@ -34,6 +35,7 @@ export class LabelsController {
   ) {}
 
   @Post()
+  @RateLimit(30)
   @Authenticated()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')

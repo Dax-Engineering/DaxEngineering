@@ -18,7 +18,12 @@ import {
   type SupplierPage,
   PartyImportQuery,
 } from '@dax/parties-contract';
-import { type DaxRequest, Requires, sessionOf } from '@dax/platform-core';
+import {
+  type DaxRequest,
+  RateLimit,
+  Requires,
+  sessionOf,
+} from '@dax/platform-core';
 import { csvTemplate } from './csv-import';
 import { actorOf, importText, parse } from './http';
 import { SUPPLIERS } from './kinds';
@@ -43,6 +48,7 @@ export class SuppliersController {
   }
 
   @Post('import')
+  @RateLimit(10)
   @Requires('parties.supplier.import')
   @HttpCode(200)
   importCsv(

@@ -16,7 +16,7 @@ import {
   type SerialPage,
   SerialQuery,
 } from '@dax/inventory-contract';
-import { Requires } from '@dax/platform-core';
+import { RateLimit, Requires } from '@dax/platform-core';
 import { parse } from '../common';
 import { SerialsService } from './serials.service';
 
@@ -40,6 +40,7 @@ export class SerialsController {
   }
 
   @Post('labels/serials')
+  @RateLimit(30)
   @Requires('inventory.serial.print_label')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')

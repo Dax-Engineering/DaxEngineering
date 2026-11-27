@@ -30,6 +30,7 @@ import {
 import {
   type DaxRequest,
   Public,
+  RateLimit,
   Requires,
   sessionOf,
 } from '@dax/platform-core';
@@ -155,6 +156,7 @@ export class PhoneScanController {
   // token), and only with the link token + code, then the phone token.
 
   @Post('pair')
+  @RateLimit(20)
   @Public()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
@@ -163,6 +165,7 @@ export class PhoneScanController {
   }
 
   @Post('state')
+  @RateLimit(20)
   @Public()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
@@ -171,6 +174,7 @@ export class PhoneScanController {
   }
 
   @Post('scan')
+  @RateLimit(120)
   @Public()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
@@ -179,6 +183,7 @@ export class PhoneScanController {
   }
 
   @Post('photo')
+  @RateLimit(120)
   @Public()
   @HttpCode(200)
   @UseInterceptors(

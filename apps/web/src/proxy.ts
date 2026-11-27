@@ -13,8 +13,10 @@ export function proxy(request: NextRequest) {
     "worker-src 'self'",
     "manifest-src 'self'",
   ].join('; ');
+  const requestId = crypto.randomUUID();
   const headers = new Headers(request.headers);
   headers.set('x-nonce', nonce);
+  headers.set('x-request-id', requestId);
   headers.set('content-security-policy', csp);
   headers.set(
     'x-dax-path',
@@ -23,6 +25,7 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers } });
   response.headers.set('content-security-policy', csp);
   response.headers.set('cache-control', 'private, no-store');
+  response.headers.set('x-request-id', requestId);
   return response;
 }
 
@@ -32,7 +35,7 @@ export const config = {
       // Uploads skip the proxy, which would buffer the body and cut it at 10 MB.
       // Label and AOD PDFs skip it so the browser's PDF viewer is not blocked by the page CSP.
       source:
-        '/((?!_next/static|_next/image|favicon.ico|healthz|api/files|api/labels|api/aods|sw.js|manifest.webmanifest|offline.html|icons/|zxing/).*)',
+        '/((?!_next/static|_next/image|favicon.ico|healthz|monitoring|api/files|api/labels|api/aods|sw.js|manifest.webmanifest|offline.html|icons/|zxing/).*)',
       missing: [{ type: 'header', key: 'next-router-prefetch' }],
     },
   ],

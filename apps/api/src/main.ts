@@ -1,4 +1,6 @@
+import './instrument';
 import { NestFactory } from '@nestjs/core';
+import { getGlobalScope } from '@sentry/nestjs';
 import express from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
@@ -8,6 +10,7 @@ import { loadEnv } from './env';
 import { loadEnabledModules } from './module-catalog';
 
 async function bootstrap(): Promise<void> {
+  getGlobalScope().setTag('service', 'api');
   const env = loadEnv();
   const enabled = await loadEnabledModules(env.DATABASE_URL);
   const app = await NestFactory.create(AppModule.forRoot(env, enabled), {

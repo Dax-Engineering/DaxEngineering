@@ -4,13 +4,18 @@ One VPS runs Coolify with two environments of the `dax` project, both from
 `infra/coolify/compose.yml`: `staging` and `production`. They share nothing: separate databases,
 volumes, secrets and R2 buckets. Staging only ever holds fake data.
 
-The server never builds anything. GitHub Actions builds five images (`dax-postgres`,
-`dax-migrate`, `dax-api`, `dax-web`, `dax-admin`), pushes them to GHCR, then asks Coolify to
-deploy. `dax-postgres` is `postgres:18-alpine` with `infra/postgres/initdb` baked in.
+The server never builds anything. GitHub Actions builds six images (`dax-postgres`,
+`dax-migrate`, `dax-api`, `dax-web`, `dax-admin`, `dax-backup`), pushes them to GHCR, then asks
+Coolify to deploy. `dax-postgres` is `postgres:18-alpine` with `infra/postgres/initdb` baked in;
+`dax-backup` is built from `infra/backup`.
 
 ## 1. Server setup (once)
 
-1. A fresh Ubuntu 24.04 VPS (4 GB RAM or more), with SSH keys only and no root password login.
+1. A fresh Ubuntu 24.04 VPS with **8 GB RAM**, SSH keys only and no root password login. The
+   compose file caps each container (`mem_limit`, `cpus`); together the caps come to about
+   4.2 GB per environment, so 8 GB holds staging and production with room for Coolify. On a
+   4 GB server, lower the caps in `infra/coolify/compose.yml` (for example halve `postgres`
+   and `api`) and run only one environment there.
 2. Install Coolify with the official script from coolify.io (`curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash`).
 3. Firewall (`ufw`):
    - 80 and 443 open to everyone.
@@ -35,30 +40,42 @@ deploy. `dax-postgres` is `postgres:18-alpine` with `infra/postgres/initdb` bake
 
 Coolify lists every `${VAR:?…}` in the compose file as a required variable.
 
-| Variable                      | Notes                                                                                                                                 |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `IMAGE_REGISTRY`              | e.g. `ghcr.io/<github-org>`                                                                                                           |
-| `IMAGE_TAG`                   | `staging` or `production` (CI moves these tags; every image also has an immutable SHA tag for rollback)                               |
-| `POSTGRES_SUPERUSER_PASSWORD` | Only used by Postgres itself. Long random value                                                                                       |
-| `DAX_MIGRATOR_PASSWORD`       | Migration role                                                                                                                        |
-| `DAX_APP_PASSWORD`            | Runtime app role                                                                                                                      |
-| `DAX_BACKUP_PASSWORD`         | Read-only backup role                                                                                                                 |
-| `LOG_LEVEL`                   | `info` (default)                                                                                                                      |
-| `BETTER_AUTH_SECRET`          | Signs session cookies. Long random value; changing it signs everyone out                                                              |
-| `INTERNAL_TOKEN_WEB`          | Shared by `api` and `web`. Must differ from the admin token                                                                           |
-| `INTERNAL_TOKEN_ADMIN`        | Shared by `api` and `admin`                                                                                                           |
-| `WEB_ORIGIN`                  | e.g. `https://stores.<domain>` (no trailing slash)                                                                                    |
-| `ADMIN_ORIGIN`                | e.g. `https://admin.<domain>`                                                                                                         |
-| `RESEND_API_KEY`              | Resend key with send-only permission                                                                                                  |
-| `MAIL_FROM`                   | e.g. `DAX <no-reply@<domain>>`; the domain must be verified in Resend                                                                 |
-| `BOOTSTRAP_ADMIN_*`           | `NAME`, `USERNAME`, `EMAIL`, `PASSWORD`. Set for the first deploy only, then delete them                                              |
-| `DATA_ENCRYPTION_KEYS`        | Key ring for Restricted columns: `k1:<base64 32 bytes>`, comma-separated when rotating. Back it up offline; losing it loses that data |
-| `DATA_ENCRYPTION_ACTIVE_KEY`  | Id of the key new values are encrypted with, e.g. `k1`                                                                                |
-| `S3_ENDPOINT`                 | Cloudflare R2: `https://<account-id>.r2.cloudflarestorage.com` (no bucket in the URL)                                                 |
-| `S3_BUCKET`                   | Private R2 bucket for this environment only, e.g. `dax-staging-files` or `dax-prod-files`. No public access                           |
-| `S3_ACCESS_KEY_ID`            | R2 API token scoped to that one bucket with **Object Read & Write** only (no admin, no other buckets)                                 |
-| `S3_SECRET_ACCESS_KEY`        | Secret for the same R2 token                                                                                                          |
-| `S3_REGION`                   | `auto` (default) for R2                                                                                                               |
+| Variable                       | Notes                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `IMAGE_REGISTRY`               | e.g. `ghcr.io/<github-org>`                                                                                                           |
+| `IMAGE_TAG`                    | `staging` or `production` (CI moves these tags; every image also has an immutable SHA tag for rollback)                               |
+| `POSTGRES_SUPERUSER_PASSWORD`  | Only used by Postgres itself. Long random value                                                                                       |
+| `DAX_MIGRATOR_PASSWORD`        | Migration role                                                                                                                        |
+| `DAX_APP_PASSWORD`             | Runtime app role                                                                                                                      |
+| `DAX_BACKUP_PASSWORD`          | Read-only backup role                                                                                                                 |
+| `LOG_LEVEL`                    | `info` (default)                                                                                                                      |
+| `BETTER_AUTH_SECRET`           | Signs session cookies. Long random value; changing it signs everyone out                                                              |
+| `INTERNAL_TOKEN_WEB`           | Shared by `api` and `web`. Must differ from the admin token                                                                           |
+| `INTERNAL_TOKEN_ADMIN`         | Shared by `api` and `admin`                                                                                                           |
+| `WEB_ORIGIN`                   | e.g. `https://stores.<domain>` (no trailing slash)                                                                                    |
+| `ADMIN_ORIGIN`                 | e.g. `https://admin.<domain>`                                                                                                         |
+| `RESEND_API_KEY`               | Resend key with send-only permission                                                                                                  |
+| `MAIL_FROM`                    | e.g. `DAX <no-reply@<domain>>`; the domain must be verified in Resend                                                                 |
+| `BOOTSTRAP_ADMIN_*`            | `NAME`, `USERNAME`, `EMAIL`, `PASSWORD`. Set for the first deploy only, then delete them                                              |
+| `DATA_ENCRYPTION_KEYS`         | Key ring for Restricted columns: `k1:<base64 32 bytes>`, comma-separated when rotating. Back it up offline; losing it loses that data |
+| `DATA_ENCRYPTION_ACTIVE_KEY`   | Id of the key new values are encrypted with, e.g. `k1`                                                                                |
+| `S3_ENDPOINT`                  | Cloudflare R2: `https://<account-id>.r2.cloudflarestorage.com` (no bucket in the URL)                                                 |
+| `S3_BUCKET`                    | Private R2 bucket for this environment only, e.g. `dax-staging-files` or `dax-prod-files`. No public access                           |
+| `S3_ACCESS_KEY_ID`             | R2 API token scoped to that one bucket with **Object Read & Write** only (no admin, no other buckets)                                 |
+| `S3_SECRET_ACCESS_KEY`         | Secret for the same R2 token                                                                                                          |
+| `S3_REGION`                    | `auto` (default) for R2                                                                                                               |
+| `BACKUP_AGE_RECIPIENT`         | Public key (`age1...`) the backups are encrypted with. See section 7                                                                  |
+| `BACKUP_S3_BUCKET`             | Backup bucket for this environment, e.g. `dax-prod-backups`. Same R2 account as `S3_ENDPOINT`                                         |
+| `BACKUP_S3_ACCESS_KEY_ID`      | R2 token scoped to the backup bucket with **Object Read & Write**                                                                     |
+| `BACKUP_S3_SECRET_ACCESS_KEY`  | Secret for the same token                                                                                                             |
+| `FILES_READ_ACCESS_KEY_ID`     | Second R2 token on the files bucket with **Object Read** only, used to copy files into the backup                                     |
+| `FILES_READ_SECRET_ACCESS_KEY` | Secret for the same token                                                                                                             |
+| `BACKUP_PING_URL`              | The Healthchecks.io ping URL for this environment's backup check                                                                      |
+| `BACKUP_AT`                    | Optional. Daily backup time, `HH:MM` Colombo time (default `01:30`)                                                                   |
+| `SENTRY_DSN`                   | Optional. DSN of the Sentry project for `api` and `worker`. Unset sends nothing                                                       |
+| `SENTRY_DSN_WEB`               | Optional. DSN of the Sentry project for the stores app                                                                                |
+| `SENTRY_DSN_ADMIN`             | Optional. DSN of the Sentry project for the admin app                                                                                 |
+| `SENTRY_ENVIRONMENT`           | Optional. `staging` or `production`, shown on every error                                                                             |
 
 Generate each password, secret and token with `openssl rand -hex 32`. Hex keeps them safe inside connection URLs.
 
@@ -79,6 +96,18 @@ traefik.http.routers.<router-name>.middlewares=dax-staging-allow
 
 Use the router name Coolify generated for that service (shown in its labels), and keep any
 middlewares Coolify already lists there, comma-separated.
+
+In both environments, also rate-limit each client at the edge (on `web` and `admin`). The API
+has its own per-client limits on top (1,000 requests a minute, lower for pairing, PDFs and
+imports):
+
+```
+traefik.http.middlewares.dax-ratelimit.ratelimit.average=50
+traefik.http.middlewares.dax-ratelimit.ratelimit.burst=100
+traefik.http.routers.<router-name>.middlewares=dax-ratelimit
+```
+
+On staging, list both middlewares: `...middlewares=dax-staging-allow,dax-ratelimit`.
 
 ## 5. Deploys from GitHub
 
@@ -110,7 +139,58 @@ only move forward, so roll back code only when the schema still fits it.
 3. Delete the four `BOOTSTRAP_ADMIN_*` variables from Coolify and redeploy. The API logs a
    warning while they are still set.
 
-## Still to come
+## 7. Backups
 
-Encrypted nightly backups to R2 arrive in the go-live milestone (`infra/backup`). Until then,
-back up `DATA_ENCRYPTION_KEYS` offline.
+The `backup` service dumps the database every night at `BACKUP_AT`, encrypts it with age and
+uploads it to R2, then copies new uploaded files. It pings Healthchecks.io on success and on
+failure. Restores and the monthly drill: `docs/runbooks/restore.md`.
+
+1. **Keys**, on your PC: `age-keygen -o dax-<env>-backup.key`. The file holds the private key;
+   its `# public key: age1...` line is the public key.
+   - Put only the public key in Coolify (`BACKUP_AGE_RECIPIENT`).
+   - Store the private key file and `DATA_ENCRYPTION_KEYS` in the password manager, then delete
+     the file from the PC. A backup is useless without both.
+2. **Bucket**, in Cloudflare R2: one per environment, e.g. `dax-prod-backups`, private.
+   - Lifecycle rules: delete prefix `incoming/` after 1 day, `daily/` after 14 days, `weekly/`
+     after 60 days, `monthly/` after 400 days.
+   - Bucket lock rules: 14 days on prefixes `daily/`, `weekly/` and `monthly/`, so a stolen
+     token can't delete recent backups. Don't lock `incoming/`: the job removes its upload from
+     there once the dump is checked.
+3. **Tokens**: one with Object Read & Write on the backup bucket only (`BACKUP_S3_*`), and one
+   with Object Read on the files bucket only (`FILES_READ_*`).
+4. Deploy, then check the next morning that `daily/` has a dump and Healthchecks.io is green.
+   To test at once, run `backup.sh` in the `backup` container from Coolify's terminal.
+
+## 8. Monitoring and alerts
+
+All free plans; every alert goes by email to the shared on-call mailbox
+(`docs/runbooks/README.md`).
+
+**Sentry** (Developer plan, 5k errors a month):
+
+1. Create three projects: `dax-api` (Node.js, also used by the worker), `dax-web` and
+   `dax-admin` (Next.js). Copy each DSN into `SENTRY_DSN`, `SENTRY_DSN_WEB`, `SENTRY_DSN_ADMIN`
+   and set `SENTRY_ENVIRONMENT`. One set of projects serves both environments.
+2. In each project's **Security & Privacy** settings, turn on **Prevent Storing of IP
+   Addresses** and leave **Data Scrubber** on. The apps already strip bodies, cookies, headers,
+   query strings and personal details before sending; only the user id and a `request_id` tag
+   remain.
+3. Alerts: the default "new issue" email rule is enough. Tracing stays off to keep the quota for
+   errors.
+
+Browsers send their errors to `/monitoring` on the same site, which forwards them to Sentry, so
+the page CSP stays `'self'`.
+
+**UptimeRobot** (5-minute checks):
+
+1. HTTP(S) monitor `https://stores.<domain>/healthz/deep`. It returns 503 when the API, the
+   database, the worker heartbeat or the outbox is unhealthy.
+2. HTTP(S) monitor `https://admin.<domain>/healthz`.
+3. Turn on SSL expiry reminders for both.
+
+**Healthchecks.io**: one check per environment, period 1 day, grace 2 hours. Its ping URL is
+`BACKUP_PING_URL`.
+
+**Coolify notifications** (**Notifications → Email**, through a separate send-only Resend key):
+turn on container stopped or unhealthy, deployment failed, and server disk usage above 80%
+(**Servers → your server → Disk usage notification**).
