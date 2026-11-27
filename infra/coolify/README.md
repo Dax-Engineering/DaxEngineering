@@ -72,6 +72,13 @@ Coolify lists every `${VAR:?…}` in the compose file as a required variable.
 | `FILES_READ_SECRET_ACCESS_KEY` | Secret for the same token                                                                                                             |
 | `BACKUP_PING_URL`              | The Healthchecks.io ping URL for this environment's backup check                                                                      |
 | `BACKUP_AT`                    | Optional. Daily backup time, `HH:MM` Colombo time (default `01:30`)                                                                   |
+| `PITR_S3_BUCKET`               | Point-in-time recovery bucket for this environment, e.g. `dax-prod-pitr`. Not the backup bucket. See section 7                        |
+| `PITR_S3_ACCESS_KEY_ID`        | R2 token scoped to the PITR bucket with **Object Read & Write**                                                                       |
+| `PITR_S3_SECRET_ACCESS_KEY`    | Secret for the same token                                                                                                             |
+| `PITR_CIPHER_PASS`             | Encrypts everything in the PITR bucket. Long random value; store it offline too, without it nothing can be restored                   |
+| `PITR_PING_URL`                | The Healthchecks.io ping URL for this environment's PITR check                                                                        |
+| `PITR_BACKUP_AT`               | Optional. Daily base backup time, `HH:MM` Colombo time (default `02:30`)                                                              |
+| `DAX_RESTORE`                  | Never set in normal running. Only during a restore: see `docs/runbooks/restore.md`                                                    |
 | `SENTRY_DSN`                   | Optional. DSN of the Sentry project for `api` and `worker`. Unset sends nothing                                                       |
 | `SENTRY_DSN_WEB`               | Optional. DSN of the Sentry project for the stores app                                                                                |
 | `SENTRY_DSN_ADMIN`             | Optional. DSN of the Sentry project for the admin app                                                                                 |
@@ -143,7 +150,7 @@ only move forward, so roll back code only when the schema still fits it.
 
 The `backup` service dumps the database every night at `BACKUP_AT`, encrypts it with age and
 uploads it to R2, then copies new uploaded files. It pings Healthchecks.io on success and on
-failure. Restores and the monthly drill: `docs/runbooks/restore.md`.
+failure. Restores and the restore drill: `docs/runbooks/restore.md`.
 
 1. **Keys**, on your PC: `age-keygen -o dax-<env>-backup.key`. The file holds the private key;
    its `# public key: age1...` line is the public key.
@@ -160,6 +167,31 @@ failure. Restores and the monthly drill: `docs/runbooks/restore.md`.
    with Object Read on the files bucket only (`FILES_READ_*`).
 4. Deploy, then check the next morning that `daily/` has a dump and Healthchecks.io is green.
    To test at once, run `backup.sh` in the `backup` container from Coolify's terminal.
+
+### Point-in-time recovery
+
+The nightly dump can lose up to a day. Point-in-time recovery cuts that to about 15 seconds:
+
+- Postgres sends its write-ahead log (every committed change) to the PITR bucket with
+  pgBackRest, at most 15 seconds after a change and only when something changed.
+- The `pitr` service takes a base backup every day at `PITR_BACKUP_AT`: full on Sundays,
+  differential on other days. It keeps the last three full backups and the log since the oldest.
+- Everything in the bucket is compressed and encrypted with `PITR_CIPHER_PASS`.
+- A restore replays the log to the latest change, or to any moment since the oldest full backup (two weeks or more).
+
+Setup, per environment:
+
+1. **Bucket**: `dax-<env>-pitr`, private. No lifecycle rules and no bucket lock: pgBackRest
+   rewrites its index files and removes expired backups itself.
+2. **Token**: Object Read & Write on that bucket only (`PITR_S3_*`).
+3. **Passphrase**: `openssl rand -hex 32` into `PITR_CIPHER_PASS`, and into the password manager.
+4. **Check**: Healthchecks.io, period 10 minutes, grace 30 minutes, ping URL in `PITR_PING_URL`.
+   The `pitr` service pings every 5 minutes, and pings `/fail` with the reason when the log
+   can't reach R2, a daily backup fails or the last backup is over 26 hours old.
+5. Deploy. The `pitr` service creates the repository and takes the first full backup at once;
+   `docker logs` on it shows `Backup finished`.
+
+The nightly dump stays: it is a second, independent copy in a different format.
 
 ## 8. Monitoring and alerts
 
@@ -186,10 +218,13 @@ the page CSP stays `'self'`.
 1. HTTP(S) monitor `https://stores.<domain>/healthz/deep`. It returns 503 when the API, the
    database, the worker heartbeat or the outbox is unhealthy.
 2. HTTP(S) monitor `https://admin.<domain>/healthz`.
-3. Turn on SSL expiry reminders for both.
+3. SSL expiry reminders are a paid UptimeRobot feature. Coolify renews certificates itself, and
+   both checks fail if HTTPS breaks.
 
-**Healthchecks.io**: one check per environment, period 1 day, grace 2 hours. Its ping URL is
-`BACKUP_PING_URL`.
+**Healthchecks.io**: two checks per environment:
+
+- Nightly backup: period 1 day, grace 2 hours, ping URL `BACKUP_PING_URL`.
+- Point-in-time recovery: period 10 minutes, grace 30 minutes, ping URL `PITR_PING_URL`.
 
 **Coolify notifications** (**Notifications → Email**, through a separate send-only Resend key):
 turn on container stopped or unhealthy, deployment failed, and server disk usage above 80%

@@ -26,6 +26,8 @@ export const REPLAYED_HEADER = 'Idempotent-Replayed';
 const KEY_FORMAT = /^[A-Za-z0-9_-]{8,64}$/;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const CLAIM_ATTEMPTS = 2;
+// Longer than any request can run, so an unfinished claim this old was cut off by a crash.
+export const ABANDONED_AFTER_MS = 60_000;
 
 interface KeyId {
   userId: string;
@@ -149,7 +151,15 @@ export class IdempotencyInterceptor implements NestInterceptor {
             'This Idempotency-Key was already used for a different request.',
         });
       }
-      if (existing.statusCode === null) throw inProgress();
+      if (existing.statusCode === null) {
+        if (Date.now() - existing.createdAt.getTime() < ABANDONED_AFTER_MS) {
+          throw inProgress();
+        }
+        await this.prisma.idempotencyKey.deleteMany({
+          where: { ...id, statusCode: null, createdAt: existing.createdAt },
+        });
+        continue;
+      }
       return {
         statusCode: existing.statusCode,
         body: existing.response ?? undefined,

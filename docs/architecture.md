@@ -288,16 +288,16 @@ nightly reconcile then checks layers against shelf stock.
 
 ## Milestones
 
-| #   | Scope                                                                                                                                                                                                          | Status          |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| M0  | Workspace, boundaries, Prisma layout, DB roles, logging, health, Docker, CI                                                                                                                                    | done            |
-| M1  | Better Auth in NestJS, Next auth proxy, login/2FA screens, internal tokens                                                                                                                                     | built           |
-| M2  | Registry, ACM, policy cache, visibility layer, audit, crypto, numbering, approvals, files, events, admin panel                                                                                                 | built           |
-| M3  | Parties, items, bins, QR labels, stock views, scanner, PWA                                                                                                                                                     | built           |
-| M4  | Stock engine, receiving, GRN, put-away                                                                                                                                                                         | built           |
-| M5  | MRN, AOD, holds                                                                                                                                                                                                | built           |
-| M6  | Returns, counts, warranty bin, reports                                                                                                                                                                         | built           |
-| M7  | Hardening: encrypted nightly backups + restore drill, API rate limits, client IP fix, dependency and secret scanning, Sentry error tracking, deep health check, container limits, runbooks · then UAT, go-live | hardening built |
+| #   | Scope                                                                                                                                                                                                                                                              | Status          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- |
+| M0  | Workspace, boundaries, Prisma layout, DB roles, logging, health, Docker, CI                                                                                                                                                                                        | done            |
+| M1  | Better Auth in NestJS, Next auth proxy, login/2FA screens, internal tokens                                                                                                                                                                                         | built           |
+| M2  | Registry, ACM, policy cache, visibility layer, audit, crypto, numbering, approvals, files, events, admin panel                                                                                                                                                     | built           |
+| M3  | Parties, items, bins, QR labels, stock views, scanner, PWA                                                                                                                                                                                                         | built           |
+| M4  | Stock engine, receiving, GRN, put-away                                                                                                                                                                                                                             | built           |
+| M5  | MRN, AOD, holds                                                                                                                                                                                                                                                    | built           |
+| M6  | Returns, counts, warranty bin, reports                                                                                                                                                                                                                             | built           |
+| M7  | Hardening: encrypted nightly backups + point-in-time recovery + restore drill, duplicate-save protection, API rate limits, client IP fix, dependency and secret scanning, Sentry error tracking, deep health check, container limits, runbooks · then UAT, go-live | hardening built |
 
 ## Decision notes
 
@@ -310,6 +310,16 @@ nightly reconcile then checks layers against shelf stock.
   R2 bucket with lifecycle rules and a 14-day bucket lock; uploaded files are copied, never
   synced. Up to a day of data can be lost; point-in-time recovery is the next step if that is
   too much.
+- **2026-11-26, point-in-time recovery:** pgBackRest in the `dax-postgres` image ships WAL to a
+  separate encrypted R2 bucket (`archive_timeout = 15s`, only when something changed), with a
+  daily base backup from the `pitr` service. A disk loss costs at most about 15 seconds of
+  committed work instead of a day. Chosen over WAL-G because it installs from the Postgres
+  package repository and has time-target restore built in. Synchronous replication to a second
+  server (no loss at all) was declined: saves would stop whenever that server is down.
+- **2026-11-26, duplicate saves:** the web and admin apps send an `Idempotency-Key` with every
+  save, derived from a per-browser cookie that rotates after each successful save. A retry
+  after a lost response replays the first result. Claims left unfinished by a crash are taken
+  over after 60 seconds.
 - **2026-11-26, throttling:** `@nestjs/throttler` with in-memory storage (one API instance),
   1,000 requests a minute per client IP, lower on phone pairing, phone scans, PDFs, CSV imports
   and scan lookups; health routes are exempt. The client IP comes from `x-dax-client-ip`, which

@@ -1,9 +1,16 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
 import { type AppName, Capabilities, MeResponse } from '@dax/platform-contract';
 import { apiUrl } from './api-url';
 import { forwardHeaders, readServerConfig } from './config';
+import {
+  newSubmitNonce,
+  SUBMIT_COOKIE,
+  SUBMIT_COOKIE_OPTIONS,
+  submitNonceFrom,
+} from './submit-nonce';
 
 export class ApiError extends Error {
   constructor(
@@ -19,6 +26,42 @@ async function incomingHeaders(): Promise<Headers> {
   const out = new Headers(h);
   out.set('cookie', c.toString());
   return out;
+}
+
+const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+export function idempotencyKey(
+  nonce: string,
+  method: string,
+  path: string,
+  body: string | undefined,
+): string {
+  return createHash('sha256')
+    .update(
+      `${nonce}
+${method}
+${path}
+${body ?? ''}`,
+    )
+    .digest('base64url');
+}
+
+// The browser's original cookie, not one rotated earlier in this request, so a retried
+// action re-sends the same keys for every save it makes.
+async function sentSubmitNonce(): Promise<string | null> {
+  return submitNonceFrom((await headers()).get('cookie'));
+}
+
+async function rotateSubmitNonce(): Promise<void> {
+  try {
+    (await cookies()).set(
+      SUBMIT_COOKIE,
+      newSubmitNonce(),
+      SUBMIT_COOKIE_OPTIONS,
+    );
+  } catch {
+    // Server Components can't set cookies; the next save then reuses the nonce, which is safe.
+  }
 }
 
 export interface CallInit {
@@ -53,14 +96,21 @@ export function createApi(app: AppName) {
       body = init.body;
     }
     if (init.accept) h.set('accept', init.accept);
+    const method = (init.method ?? 'GET').toUpperCase();
+    const nonce = MUTATING.has(method) ? await sentSubmitNonce() : null;
+    if (nonce) {
+      h.set('idempotency-key', idempotencyKey(nonce, method, path, body));
+    }
     try {
-      return await fetch(apiUrl(path, config.apiUrl), {
-        method: init.method ?? 'GET',
+      const res = await fetch(apiUrl(path, config.apiUrl), {
+        method,
         headers: h,
         body,
         cache: 'no-store',
         redirect: 'manual',
       });
+      if (nonce && res.ok) await rotateSubmitNonce();
+      return res;
     } catch {
       throw new ApiError(503, {
         code: 'API_UNAVAILABLE',
