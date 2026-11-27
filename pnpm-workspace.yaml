@@ -14,3 +14,8 @@ allowBuilds:
   prisma: true
   '@prisma/engines': true
   '@nestjs/core': false
+
+# Security floors for transitive dependencies (pnpm audit). Drop once the parents ship them.
+overrides:
+  multer: ^2.5.0
+  effect: ^3.22.1
