@@ -670,7 +670,7 @@ export class MrnsService {
         items,
         line.itemId,
         `lines.${i}.itemId`,
-        prev?.itemId !== line.itemId,
+        prev?.itemId !== line.itemId ? 'issue' : null,
       );
       checkQty(item, line.qty, `lines.${i}.qty`);
       return {

@@ -30,7 +30,7 @@ export type WarrantyStatus = (typeof WARRANTY_STATUSES)[number];
 export type WarrantyOutcome = (typeof WARRANTY_OUTCOMES)[number];
 
 const tagFields = {
-  itemId: z.uuid(),
+  itemId: z.uuid('Choose the failed part'),
   qty: PositiveQty,
   serialNo: OptionalText(60),
   machineModelId: z.uuid().nullable().optional(),
@@ -54,14 +54,14 @@ export const WarrantyTagUpdate = z
 export type WarrantyTagUpdate = z.infer<typeof WarrantyTagUpdate>;
 export const WarrantySend = z.strictObject({
   version: z.int(),
-  supplierId: z.uuid(),
+  supplierId: z.uuid('Choose a supplier'),
   claimNumber: OptionalText(60),
 });
 export type WarrantySend = z.infer<typeof WarrantySend>;
 export const WarrantyClose = z
   .strictObject({
     version: z.int(),
-    outcome: z.enum(WARRANTY_OUTCOMES),
+    outcome: z.enum(WARRANTY_OUTCOMES, 'Choose an outcome'),
     note: OptionalText(500),
   })
   .refine((v) => !WARRANTY_NOTE_REQUIRED.includes(v.outcome) || !!v.note, {

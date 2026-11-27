@@ -22,7 +22,6 @@ const STALE =
   'Someone else changed this item. Reload the page to see their changes.';
 const CODES = {
   ITEM_EXISTS: 'This brand already has an item with this part number.',
-  BARCODE_IN_USE: 'This barcode is already on another item.',
   SUPERSESSION_CYCLE:
     'That would make this part number supersede itself in a loop.',
 };

@@ -67,7 +67,12 @@ export async function checkBundleLines(
   );
   const seen = new Set<string>();
   lines.forEach((line, i) => {
-    const item = requireItem(items, line.itemId, `${field}.${i}.itemId`, true);
+    const item = requireItem(
+      items,
+      line.itemId,
+      `${field}.${i}.itemId`,
+      'bundle',
+    );
     if (seen.has(line.itemId)) {
       conflict(
         'DUPLICATE_PART',

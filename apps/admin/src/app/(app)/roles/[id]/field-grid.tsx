@@ -31,11 +31,14 @@ function FieldRow({
   access,
   readOnly,
   onChange,
+  unlockedBy,
 }: {
   field: CatalogField;
   access: FieldAccess;
   readOnly: boolean;
   onChange: (access: FieldAccess) => void;
+  /** Label of the permission that also opens this field. */
+  unlockedBy?: string;
 }) {
   const value = normalizeAccess(field, access);
   const changed = isChanged(field, access);
@@ -54,6 +57,11 @@ function FieldRow({
           {field.encrypted ? (
             <Text size="xs" c="dimmed">
               Encrypted
+            </Text>
+          ) : null}
+          {unlockedBy ? (
+            <Text size="xs" c="dimmed">
+              Also open to anyone with “{unlockedBy}”
             </Text>
           ) : null}
         </Group>
@@ -117,11 +125,13 @@ export function FieldGrid({
   fields,
   setFields,
   readOnly,
+  permissionLabels,
 }: {
   entities: readonly CatalogEntity[];
   fields: FieldState;
   setFields: Dispatch<SetStateAction<FieldState>>;
   readOnly: boolean;
+  permissionLabels?: ReadonlyMap<string, string>;
 }) {
   const setOne = (fieldId: string, access: FieldAccess) =>
     setFields((prev) => ({ ...prev, [fieldId]: access }));
@@ -219,6 +229,12 @@ export function FieldGrid({
                               access={fields[field.id] ?? tierDefault(field)}
                               readOnly={readOnly}
                               onChange={(access) => setOne(field.id, access)}
+                              unlockedBy={
+                                field.unlockedBy
+                                  ? (permissionLabels?.get(field.unlockedBy) ??
+                                    field.unlockedBy)
+                                  : undefined
+                              }
                             />
                           ))}
                         </Table.Tbody>

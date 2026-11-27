@@ -178,7 +178,12 @@ describe('item rules', () => {
   it('refuses a barcode another item already uses', async () => {
     const prisma = asPrisma({
       item: { findUnique: async () => ({ id: ITEM }) },
-      itemBarcode: { findUnique: async () => ({ id: OTHER }) },
+      itemBarcode: {
+        findUnique: async () => ({
+          itemId: OTHER,
+          item: { partNo: '1R-0750' },
+        }),
+      },
     });
     const service = new ItemsService(prisma, fakeAudit().service, fakeStore);
     const error = await failure(
@@ -188,6 +193,9 @@ describe('item rules', () => {
       }),
     );
     expect(codeOf(error)).toBe('BARCODE_IN_USE');
+    expect(error.getResponse()).toMatchObject({
+      message: 'That barcode is already on another part: 1R-0750.',
+    });
   });
 
   it('checks field write access', async () => {

@@ -7,8 +7,10 @@ import {
   TableTr,
 } from '@mantine/core';
 import Link from 'next/link';
+import type { Capabilities } from '@dax/platform-contract';
 import {
   canDo,
+  canWriteField,
   CardBody,
   Empty,
   Facts,
@@ -205,9 +207,15 @@ export async function PartyListPage({
   );
 }
 
+function editableFields(caps: Capabilities, kind: PartyKind): string[] {
+  const keys: string[] = CONTACT_FIELDS.map((f) => f.key);
+  if (kind === 'supplier') keys.push('country');
+  return keys.filter((k) => canWriteField(caps, PARTIES[kind].permission, k));
+}
+
 export async function PartyNewPage({ kind }: { kind: PartyKind }) {
   const config = PARTIES[kind];
-  await requirePermission(`${config.permission}.create`);
+  const caps = await requirePermission(`${config.permission}.create`);
   return (
     <>
       <PageHead
@@ -216,7 +224,7 @@ export async function PartyNewPage({ kind }: { kind: PartyKind }) {
         lede="The code is given automatically when you save."
       />
       <SectionCard title="Details">
-        <PartyForm kind={kind} />
+        <PartyForm kind={kind} editable={editableFields(caps, kind)} />
       </SectionCard>
     </>
   );
@@ -283,7 +291,12 @@ export async function PartyDetailPage({
       </div>
       <SectionCard title="Details">
         {canEdit ? (
-          <PartyForm key={party.version} kind={kind} party={party} />
+          <PartyForm
+            key={party.version}
+            kind={kind}
+            party={party}
+            editable={editableFields(caps, kind)}
+          />
         ) : (
           <Facts
             items={[

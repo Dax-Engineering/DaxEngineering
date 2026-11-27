@@ -14,6 +14,10 @@ export const partiesManifest = defineModule({
         edit: {},
         archive: {},
         import: { label: 'Import from CSV' },
+        contact_details: {
+          label: 'See and edit contact details',
+          description: 'Contact person, phone, email, address and tax number.',
+        },
       },
     },
     supplier: {
@@ -24,6 +28,10 @@ export const partiesManifest = defineModule({
         edit: {},
         archive: {},
         import: { label: 'Import from CSV' },
+        contact_details: {
+          label: 'See and edit contact details',
+          description: 'Contact person, phone, email, address and tax number.',
+        },
       },
     },
   },

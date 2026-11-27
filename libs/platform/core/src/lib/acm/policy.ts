@@ -45,6 +45,8 @@ export interface CatalogField {
   tier: FieldTier;
   locked: boolean;
   writable: boolean;
+  /** Holding this permission gives read and write, whatever the field grants say. */
+  unlockedBy?: string | null;
 }
 
 export interface PolicyCatalog {
@@ -185,7 +187,7 @@ export function resolvePolicy(input: PolicyInput): Policy {
     if (!enabledModules.has(f.moduleKey)) continue;
     let read = false;
     let write = false;
-    if (isSuperAdmin) {
+    if (isSuperAdmin || (f.unlockedBy && permissions.has(f.unlockedBy))) {
       read = true;
       write = f.writable;
     } else {

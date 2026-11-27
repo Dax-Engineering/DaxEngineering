@@ -7,13 +7,19 @@ import {
   Group,
   List,
   ListItem,
+  Radio,
   Stack,
   Table,
   Text,
 } from '@mantine/core';
 import { startTransition, useActionState, useState } from 'react';
 import { Mono, Pill, SectionCard, ScrollTable } from '@dax/web-shell';
-import type { ImportKind, ImportState } from '../lib/import';
+import type {
+  ImportKind,
+  ImportMode,
+  ImportModeOption,
+  ImportState,
+} from '../lib/import';
 import { runImport } from '../lib/import-actions';
 import { AppLink } from './links';
 
@@ -25,17 +31,28 @@ export function ImportScreen({
   columns,
   notes,
   backHref,
+  modes,
 }: {
   kind: ImportKind;
   noun: string;
   columns: readonly string[];
   notes: string[];
   backHref: string;
+  /** Offer a choice between adding only and also updating existing rows. */
+  modes?: ImportModeOption[];
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [sentFile, setSentFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<ImportMode>(modes?.[0]?.value ?? 'add');
+  const [sent, setSent] = useState<{
+    file: File;
+    mode: ImportMode;
+  } | null>(null);
   const [state, dispatch, pending] = useActionState(runImport, IDLE);
-  const current = sentFile === file ? state : IDLE;
+  const current =
+    sent && sent.file === file && sent.mode === mode ? state : IDLE;
+  const modeNotes = modes?.find((m) => m.value === mode)?.notes ?? [];
+  const allNotes = [...notes, ...modeNotes];
+  const plural = (n: number) => (n === 1 ? noun : `${noun}s`);
   const result = current.result;
   const ready = result?.dryRun === true && result.errors.length === 0;
   const done = result?.dryRun === false && result.errors.length === 0;
@@ -46,7 +63,8 @@ export function ImportScreen({
     form.set('kind', kind);
     form.set('file', file);
     form.set('dryRun', String(dryRun));
-    setSentFile(file);
+    form.set('mode', mode);
+    setSent({ file, mode });
     startTransition(() => dispatch(form));
   }
 
@@ -65,9 +83,22 @@ export function ImportScreen({
               </span>
             ))}
           </div>
-          {notes.length ? (
+          {modes && modes.length > 1 ? (
+            <Radio.Group
+              label="What should the import do?"
+              value={mode}
+              onChange={(v) => setMode(v as ImportMode)}
+            >
+              <Stack gap={6} mt={6}>
+                {modes.map((m) => (
+                  <Radio key={m.value} value={m.value} label={m.label} />
+                ))}
+              </Stack>
+            </Radio.Group>
+          ) : null}
+          {allNotes.length ? (
             <List size="sm" spacing={4}>
-              {notes.map((n) => (
+              {allNotes.map((n) => (
                 <ListItem key={n}>{n}</ListItem>
               ))}
             </List>
@@ -152,8 +183,14 @@ export function ImportScreen({
               <>
                 <Text size="sm">
                   <Pill tone="ok">Ready</Pill> All {result.total} rows look
-                  good. Importing adds them all at once; if anything fails,
-                  nothing is added.
+                  good.{' '}
+                  {result.updated !== undefined && mode === 'upsert'
+                    ? `${result.created} new ${plural(result.created)} to add, ${result.updated} to update${
+                        result.total - result.created - result.updated > 0
+                          ? `, ${result.total - result.created - result.updated} already up to date`
+                          : ''
+                      }. Importing saves them all at once; if anything fails, nothing is saved.`
+                    : 'Importing adds them all at once; if anything fails, nothing is added.'}
                 </Text>
                 <Group>
                   <Button onClick={() => send(false)} loading={pending}>
@@ -164,8 +201,9 @@ export function ImportScreen({
             ) : null}
             {done ? (
               <Alert color="green">
-                Imported {result.created}{' '}
-                {result.created === 1 ? noun : `${noun}s`}.{' '}
+                {result.updated
+                  ? `Added ${result.created} new ${plural(result.created)} and updated ${result.updated}.`
+                  : `Imported ${result.created} ${plural(result.created)}.`}{' '}
                 <AppLink href={backHref}>Back to the list</AppLink>
               </Alert>
             ) : null}

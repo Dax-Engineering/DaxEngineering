@@ -13,7 +13,7 @@ export default async function NewItemPage() {
       <PageHead
         back={{ href: '/inventory/stock', label: 'Stock' }}
         title="New item"
-        lede="Part number, brand, unit and minimum stock. Add barcodes after saving."
+        lede="Part number, brand, unit and minimum stock. Add barcodes on the part's page after saving."
       />
       {catalog.brands.length === 0 ? (
         <Alert color="orange">

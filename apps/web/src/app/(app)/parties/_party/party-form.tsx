@@ -15,10 +15,6 @@ import { fieldError, IDLE } from '../../../../lib/action-state';
 import { saveParty } from './actions';
 import { CONTACT_FIELDS, type PartyDto, type PartyKind } from './config';
 
-function has(party: PartyDto | undefined, key: string): boolean {
-  return !party || key in party;
-}
-
 function value(party: PartyDto | undefined, key: string): string {
   const v = party ? (party as Record<string, unknown>)[key] : undefined;
   return typeof v === 'string' ? v : '';
@@ -27,12 +23,17 @@ function value(party: PartyDto | undefined, key: string): string {
 export function PartyForm({
   kind,
   party,
+  editable,
 }: {
   kind: PartyKind;
   party?: PartyDto;
+  /** Fields this user may change; on a new record the others are left out. */
+  editable: readonly string[];
 }) {
   const [state, action, pending] = useActionState(saveParty, IDLE);
   const err = (key: string) => fieldError(state, key);
+  const has = (key: string) => (party ? key in party : editable.includes(key));
+  const locked = (key: string) => !editable.includes(key);
 
   return (
     <form action={action}>
@@ -56,10 +57,11 @@ export function PartyForm({
         />
         {kind === 'supplier' ? (
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            {has(party, 'country') ? (
+            {has('country') ? (
               <TextInput
                 name="country"
                 label="Country"
+                disabled={locked('country')}
                 maxLength={60}
                 defaultValue={value(party, 'country')}
                 error={err('country')}
@@ -79,40 +81,34 @@ export function PartyForm({
           </SimpleGrid>
         ) : null}
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          {CONTACT_FIELDS.filter((f) => !f.multiline && has(party, f.key)).map(
-            (f) => (
-              <TextInput
-                key={f.key}
-                name={f.key}
-                label={f.label}
-                type={
-                  f.key === 'email'
-                    ? 'email'
-                    : f.key === 'phone'
-                      ? 'tel'
-                      : 'text'
-                }
-                defaultValue={value(party, f.key)}
-                error={err(f.key)}
-                size="md"
-              />
-            ),
-          )}
-        </SimpleGrid>
-        {CONTACT_FIELDS.filter((f) => f.multiline && has(party, f.key)).map(
-          (f) => (
-            <Textarea
+          {CONTACT_FIELDS.filter((f) => !f.multiline && has(f.key)).map((f) => (
+            <TextInput
               key={f.key}
               name={f.key}
               label={f.label}
-              autosize
-              minRows={2}
+              disabled={locked(f.key)}
+              type={
+                f.key === 'email' ? 'email' : f.key === 'phone' ? 'tel' : 'text'
+              }
               defaultValue={value(party, f.key)}
               error={err(f.key)}
               size="md"
             />
-          ),
-        )}
+          ))}
+        </SimpleGrid>
+        {CONTACT_FIELDS.filter((f) => f.multiline && has(f.key)).map((f) => (
+          <Textarea
+            key={f.key}
+            name={f.key}
+            label={f.label}
+            disabled={locked(f.key)}
+            autosize
+            minRows={2}
+            defaultValue={value(party, f.key)}
+            error={err(f.key)}
+            size="md"
+          />
+        ))}
         <Group>
           <Button type="submit" loading={pending} size="md">
             {party ? 'Save changes' : 'Add'}

@@ -95,16 +95,26 @@ export function checkQty(
   }
 }
 
+const ARCHIVED_REFUSAL = {
+  receive: "can't be received",
+  issue: "can't be issued",
+  bundle: "can't be added to a bundle",
+} as const;
+
+/** `mustBeActiveFor` names what an archived part is being refused for; `null` allows archived parts. */
 export function requireItem(
   items: ReadonlyMap<string, ItemCheck>,
   itemId: string,
   field: string,
-  mustBeActive: boolean,
+  mustBeActiveFor: keyof typeof ARCHIVED_REFUSAL | null,
 ): ItemCheck {
   const item = items.get(itemId);
   if (!item) invalid('Unknown item.', [field]);
-  if (mustBeActive && item.status !== 'ACTIVE') {
-    invalid(`${item.partNo} is archived and can't be received.`, [field]);
+  if (mustBeActiveFor && item.status !== 'ACTIVE') {
+    invalid(
+      `${item.partNo} is archived and ${ARCHIVED_REFUSAL[mustBeActiveFor]}.`,
+      [field],
+    );
   }
   return item;
 }

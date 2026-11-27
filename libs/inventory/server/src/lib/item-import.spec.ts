@@ -1,5 +1,10 @@
 import { ITEM_CSV_COLUMNS, ITEM_CSV_MAX_ROWS } from '@dax/inventory-contract';
-import { type ImportLookups, readItemCsv, validateImport } from './item-import';
+import {
+  type ExistingItem,
+  type ImportLookups,
+  readItemCsv,
+  validateImport,
+} from './item-import';
 import { ItemsService } from './items.service';
 import { asPrisma, fakeAudit, fakePolicy, fakeStore } from './testing';
 
@@ -23,18 +28,42 @@ const lookups: ImportLookups = {
     ['closed traders', { id: 'y', name: 'Closed Traders', active: false }],
   ]),
   storageBins: new Map([['A-01-01-A', { id: BIN }]]),
-  existingItems: new Set([`${CAT}|EXISTING1`]),
-  barcodesInUse: new Set(['5000000000001']),
+  existingItems: new Map([[`${CAT}|EXISTING1`, existingItem()]]),
+  barcodesInUse: new Map([
+    ['5000000000001', 'OTHER-1'],
+    ['5000000000009', 'EXISTING-1'],
+  ]),
 };
+
+function existingItem(over: Partial<ExistingItem> = {}): ExistingItem {
+  return {
+    id: 'item-1',
+    version: 3,
+    partNo: 'EXISTING-1',
+    archived: false,
+    description: 'Old description',
+    uom: 'PCS',
+    minQty: '2',
+    defaultBinId: null,
+    notes: 'Keep dry',
+    supplierId: null,
+    tags: ['filters'],
+    preCostPrice: '100',
+    sellingPrice: null,
+    machineModelIds: [],
+    barcodes: ['5000000000009'],
+    ...over,
+  };
+}
 
 function csv(...rows: string[]): string {
   return [HEADER, ...rows].join('\n');
 }
 
-function validate(text: string) {
+function validate(text: string, mode: 'add' | 'upsert' = 'add') {
   const read = readItemCsv(text);
   if (!read.ok) throw new Error(read.errors[0]?.message);
-  return validateImport(read.rows, lookups);
+  return validateImport(read.rows, lookups, mode);
 }
 
 describe('item CSV validation', () => {
@@ -148,6 +177,75 @@ describe('item CSV validation', () => {
     ]);
   });
 
+  it('names the part a used barcode is on', () => {
+    const { errors } = validate(
+      csv('P-1,Caterpillar,A,PCS,0,,,5000000000001,'),
+    );
+    expect(errors[0]?.message).toBe(
+      'Barcode "5000000000001" is already on another part: OTHER-1.',
+    );
+  });
+
+  it('refuses existing parts when only adding', () => {
+    const { errors } = validate(csv('existing-1,Caterpillar,New,PCS,1,,,,'));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.field).toBe('part_no');
+  });
+
+  it('updates existing parts in upsert mode, keeping blank cells', () => {
+    const { items, updates, errors } = validate(
+      csv(
+        'EXISTING 1,Caterpillar,,,,,320D,5000000000009|5000000000010,,lanka filter house,,,1500',
+        'P-NEW,Caterpillar,New part,PCS,0,,,,',
+      ),
+      'upsert',
+    );
+    expect(errors).toEqual([]);
+    expect(items.map((i) => i.partNo)).toEqual(['P-NEW']);
+    expect(updates).toEqual([
+      {
+        row: 2,
+        existing: expect.objectContaining({ id: 'item-1' }),
+        changes: {
+          supplier: { id: SUP, name: 'Lanka Filter House' },
+          sellingPrice: '1500',
+        },
+        machineModelIds: [MODEL],
+        addBarcodes: ['5000000000010'],
+      },
+    ]);
+  });
+
+  it('skips unchanged rows and checks the unit against the kept minimum', () => {
+    const { updates, errors } = validate(
+      csv('EXISTING-1,Caterpillar,Old description,,2.0,,,,', ''),
+      'upsert',
+    );
+    expect(errors).toEqual([]);
+    expect(updates).toEqual([]);
+    const fraction = validate(
+      csv('EXISTING-1,Caterpillar,,,1.5,,,,'),
+      'upsert',
+    );
+    expect(fraction.errors.map((e) => e.field)).toEqual(['min_qty']);
+  });
+
+  it('refuses to update an archived part', () => {
+    const read = readItemCsv(csv('EXISTING-1,Caterpillar,X,,,,,,'));
+    if (!read.ok) throw new Error('bad csv');
+    const { errors } = validateImport(
+      read.rows,
+      {
+        ...lookups,
+        existingItems: new Map([
+          [`${CAT}|EXISTING1`, existingItem({ archived: true })],
+        ]),
+      },
+      'upsert',
+    );
+    expect(errors[0]?.message).toMatch(/archived/);
+  });
+
   it('rejects a wrong header, an empty file and too many rows', () => {
     const header = readItemCsv('part,brand\nx,y');
     expect(header.ok).toBe(false);
@@ -216,7 +314,13 @@ describe('ItemsService.import', () => {
       csv('P-1,Caterpillar,A,PCS,0,,320D,111,'),
       true,
     );
-    expect(result).toEqual({ dryRun: true, total: 1, created: 0, errors: [] });
+    expect(result).toEqual({
+      dryRun: true,
+      total: 1,
+      created: 1,
+      updated: 0,
+      errors: [],
+    });
     expect(writes).toEqual([]);
   });
 
@@ -239,10 +343,26 @@ describe('ItemsService.import', () => {
       csv('P-1,Caterpillar,A,PCS,0,,320D,111,', 'P-2,Caterpillar,B,PCS,0,,,,'),
       false,
     );
-    expect(result).toEqual({ dryRun: false, total: 2, created: 2, errors: [] });
+    expect(result).toEqual({
+      dryRun: false,
+      total: 2,
+      created: 2,
+      updated: 0,
+      errors: [],
+    });
     expect(writes).toEqual(['transaction', 'item', 'models', 'barcodes']);
     expect(audit.entries).toEqual([
-      expect.objectContaining({ action: 'imported', after: { count: 2 } }),
+      expect.objectContaining({
+        action: 'imported',
+        after: { count: 2, updated: 0 },
+      }),
     ]);
+  });
+
+  it('needs the edit permission to update existing parts', async () => {
+    const { items } = service();
+    await expect(
+      items.import(policy, csv('P-1,Caterpillar,A,PCS,0,,,,'), true, 'upsert'),
+    ).rejects.toMatchObject({ status: 403 });
   });
 });

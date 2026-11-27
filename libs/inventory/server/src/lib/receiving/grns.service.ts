@@ -394,7 +394,7 @@ export class GrnsService {
         items,
         line.itemId,
         field('itemId'),
-        prev?.itemId !== line.itemId,
+        prev?.itemId !== line.itemId ? 'receive' : null,
       );
       const qtyExpected =
         line.qtyExpected !== undefined

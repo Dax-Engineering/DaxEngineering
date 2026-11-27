@@ -40,6 +40,7 @@ import {
 } from '../../_lib/data';
 import { listMovements } from '../../receiving/_lib/data';
 import { setItemStatus } from '../_item/actions';
+import { Barcodes } from '../_item/barcodes';
 import { ItemForm } from '../_item/item-form';
 import { Movements } from '../_item/movements';
 import { Replacement } from '../_item/replacement';
@@ -269,6 +270,13 @@ export default async function ItemPage({
                 ]}
               />
             )}
+          </SectionCard>
+
+          <SectionCard
+            title="Barcodes"
+            note="Scanning any of these finds this part"
+          >
+            <Barcodes item={item} canEdit={canEdit} />
           </SectionCard>
 
           <SectionCard title="Supersession">

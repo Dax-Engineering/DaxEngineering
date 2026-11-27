@@ -97,6 +97,7 @@ model Field {
   locked     Boolean          @default(false)
   writable   Boolean          @default(false)
   group      String?
+  unlockedBy String?          @map("unlocked_by")
   filterable Boolean          @default(false)
   sortable   Boolean          @default(false)
   removedAt  DateTime?        @map("removed_at") @db.Timestamptz(3)

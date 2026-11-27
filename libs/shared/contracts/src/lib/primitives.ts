@@ -34,6 +34,7 @@ export const ImportResult = z.object({
   dryRun: z.boolean(),
   total: z.number().int(),
   created: z.number().int(),
+  updated: z.number().int().optional(),
   errors: z.array(ImportRowError),
 });
 export type ImportResult = z.infer<typeof ImportResult>;

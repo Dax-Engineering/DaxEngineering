@@ -49,7 +49,10 @@ export const ReturnLineInput = z
 export type ReturnLineInput = z.infer<typeof ReturnLineInput>;
 
 const returnHeader = {
-  departmentId: z.uuid().nullable().optional(),
+  departmentId: z
+    .uuid('Choose the department returning the parts')
+    .nullable()
+    .optional(),
   customerId: z.uuid().nullable().optional(),
   jobNumber: OptionalText(40),
   reason: OptionalText(300),

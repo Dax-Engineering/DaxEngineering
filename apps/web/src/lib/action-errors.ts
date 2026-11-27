@@ -12,7 +12,10 @@ const CODE_MESSAGES: Record<string, string> = {
   NOT_FOUND: 'This record no longer exists.',
 };
 
+const ZOD_DEFAULT_MESSAGE = /^(Invalid|Too (big|small)|Unrecognized key)/;
+
 function issueMessage(issue: z.core.$ZodIssue): string {
+  if (!ZOD_DEFAULT_MESSAGE.test(issue.message)) return issue.message;
   switch (issue.code) {
     case 'too_small':
       return issue.minimum === 1
@@ -21,9 +24,9 @@ function issueMessage(issue: z.core.$ZodIssue): string {
     case 'too_big':
       return `At most ${String(issue.maximum)}`;
     case 'invalid_format':
-      return issue.format === 'email' ? 'Enter a valid email' : issue.message;
-    case 'custom':
-      return issue.message;
+      return issue.format === 'email'
+        ? 'Enter a valid email'
+        : 'Check this field';
     default:
       return 'Check this field';
   }

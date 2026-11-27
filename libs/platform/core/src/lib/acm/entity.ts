@@ -7,6 +7,8 @@ export interface FieldMeta {
   locked?: boolean;
   writable?: boolean;
   group?: string;
+  /** A permission that also gives read and write access to this field. */
+  unlockedBy?: string;
   filterable?: boolean;
   sortable?: boolean;
   column?: string;
@@ -50,6 +52,11 @@ export function defineEntity<F extends string>(
     if (meta.locked && meta.tier !== 'INTERNAL') {
       throw new EntityError(
         `${def.key}.${name}: locked fields must be Internal`,
+      );
+    }
+    if (meta.unlockedBy && !meta.unlockedBy.startsWith(`${def.moduleKey}.`)) {
+      throw new EntityError(
+        `${def.key}.${name}: unlockedBy must be a permission of module "${def.moduleKey}"`,
       );
     }
     if (meta.encrypted && (meta.filterable || meta.sortable)) {

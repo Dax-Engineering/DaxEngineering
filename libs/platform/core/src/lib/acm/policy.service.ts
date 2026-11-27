@@ -53,6 +53,7 @@ export class PolicyService {
           tier: true,
           locked: true,
           writable: true,
+          unlockedBy: true,
           entity: { select: { moduleKey: true } },
         },
       }),
@@ -75,6 +76,7 @@ export class PolicyService {
           tier: f.tier,
           locked: f.locked,
           writable: f.writable,
+          unlockedBy: f.unlockedBy,
         })),
       },
     };

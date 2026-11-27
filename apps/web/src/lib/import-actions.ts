@@ -8,6 +8,7 @@ import { failure } from './action-errors';
 import {
   IMPORT_API,
   IMPORT_KINDS,
+  IMPORT_MODES,
   type ImportKind,
   ImportResult,
   type ImportState,
@@ -19,6 +20,11 @@ const PERMISSION: Record<ImportKind, string> = {
   customers: 'parties.customer.import',
   suppliers: 'parties.supplier.import',
   items: 'inventory.item.import',
+};
+
+/** Kinds whose import can also update existing records. */
+const UPDATE_PERMISSION: Partial<Record<ImportKind, string>> = {
+  items: 'inventory.item.edit',
 };
 
 const LIST_PATH: Record<ImportKind, string> = {
@@ -52,11 +58,20 @@ export async function runImport(
     };
   }
 
+  const mode = z.enum(IMPORT_MODES).catch('add').parse(form.get('mode'));
+  const updatePermission = UPDATE_PERMISSION[kind.data];
+  if (
+    mode === 'upsert' &&
+    (!updatePermission || !canDo(caps, updatePermission))
+  ) {
+    return { ok: false, error: "You don't have permission to update these." };
+  }
+
   const dryRun = form.get('dryRun') !== 'false';
   const csv = await file.text();
   try {
     const result = await api.request(
-      `${IMPORT_API[kind.data]}?dryRun=${String(dryRun)}`,
+      `${IMPORT_API[kind.data]}?dryRun=${String(dryRun)}${mode === 'upsert' ? '&mode=upsert' : ''}`,
       (d) => ImportResult.parse(d),
       { method: 'POST', body: csv, contentType: 'text/csv; charset=utf-8' },
     );

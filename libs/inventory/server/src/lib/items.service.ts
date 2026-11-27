@@ -1,10 +1,11 @@
 import { seesMrnCustomer } from './issuing/shared';
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { type ImportResult, pageMeta, pageWindow } from '@dax/contracts';
 import {
   type BarcodeInput,
   type ItemDetail,
   type ItemFacets,
+  type ItemImportMode,
   type ItemInput,
   type ItemPage,
   type ItemQuery,
@@ -15,7 +16,12 @@ import {
   type SupersedeInput,
   UOMS,
 } from '@dax/inventory-contract';
-import { assertWritable, AuditService, type Policy } from '@dax/platform-core';
+import {
+  assertWritable,
+  AuditService,
+  can,
+  type Policy,
+} from '@dax/platform-core';
 import {
   Prisma,
   PrismaService,
@@ -33,11 +39,14 @@ import {
 } from './common';
 import { itemEntity } from './entities';
 import {
+  type ExistingItem,
+  type ItemChanges,
   itemKey,
   nameKey,
   readItemCsv,
   validateImport,
   type ValidItem,
+  type ValidUpdate,
 } from './item-import';
 import {
   belowMinFilter,
@@ -571,9 +580,9 @@ export class ItemsService {
     if (!item) notFound('Item not found.');
     const used = await this.prisma.itemBarcode.findUnique({
       where: { code: input.code },
-      select: { id: true },
+      select: { itemId: true, item: { select: { partNo: true } } },
     });
-    if (used) barcodeInUse();
+    if (used) barcodeInUse(used.itemId === id ? null : used.item.partNo);
     try {
       await this.prisma.$transaction(async (tx) => {
         const created = await tx.itemBarcode.create({
@@ -587,7 +596,7 @@ export class ItemsService {
         });
       });
     } catch (error) {
-      if (isUniqueViolation(error)) barcodeInUse();
+      if (isUniqueViolation(error)) barcodeInUse(undefined);
       throw error;
     }
     return this.detail(policy, id);
@@ -619,10 +628,23 @@ export class ItemsService {
     policy: Policy,
     text: string,
     dryRun: boolean,
+    mode: ItemImportMode = 'add',
   ): Promise<ImportResult> {
+    if (mode === 'upsert' && !can(policy, 'inventory.item.edit')) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: "You don't have permission to update parts.",
+      });
+    }
     const read = readItemCsv(text);
     if (!read.ok)
-      return { dryRun, total: read.total, created: 0, errors: read.errors };
+      return {
+        dryRun,
+        total: read.total,
+        created: 0,
+        updated: 0,
+        errors: read.errors,
+      };
     const rows = read.rows;
     const storeId = await this.store.id();
     const norms = [...new Set(rows.map((r) => r.partNoNorm).filter(Boolean))];
@@ -647,46 +669,127 @@ export class ItemsService {
         }),
         this.prisma.item.findMany({
           where: { partNoNorm: { in: norms } },
-          select: { brandId: true, partNoNorm: true },
+          select: {
+            id: true,
+            version: true,
+            brandId: true,
+            partNo: true,
+            partNoNorm: true,
+            status: true,
+            description: true,
+            uom: true,
+            minQty: true,
+            defaultBinId: true,
+            notes: true,
+            supplierId: true,
+            tags: true,
+            preCostPrice: true,
+            sellingPrice: true,
+            machineModels: { select: { machineModelId: true } },
+            barcodes: { select: { code: true } },
+          },
         }),
         this.prisma.itemBarcode.findMany({
           where: { code: { in: codes } },
-          select: { code: true },
+          select: { code: true, item: { select: { partNo: true } } },
         }),
         this.prisma.supplier.findMany({
           select: { id: true, name: true, active: true },
         }),
       ]);
-    const { items, errors } = validateImport(rows, {
-      brands: new Map(brands.map((b) => [nameKey(b.name), b])),
-      machineModels: new Map(models.map((m) => [nameKey(m.name), m])),
-      suppliers: new Map(suppliers.map((p) => [nameKey(p.name), p])),
-      storageBins: new Map(bins.map((b) => [b.code, b])),
-      existingItems: new Set(
-        existing.map((e) => itemKey(e.brandId, e.partNoNorm)),
+    const { items, updates, errors } = validateImport(
+      rows,
+      {
+        brands: new Map(brands.map((b) => [nameKey(b.name), b])),
+        machineModels: new Map(models.map((m) => [nameKey(m.name), m])),
+        suppliers: new Map(suppliers.map((p) => [nameKey(p.name), p])),
+        storageBins: new Map(bins.map((b) => [b.code, b])),
+        existingItems: new Map(
+          existing.map((e) => [
+            itemKey(e.brandId, e.partNoNorm),
+            {
+              id: e.id,
+              version: e.version,
+              partNo: e.partNo,
+              archived: e.status === 'ARCHIVED',
+              description: e.description,
+              uom: e.uom,
+              minQty: e.minQty.toString(),
+              defaultBinId: e.defaultBinId,
+              notes: e.notes,
+              supplierId: e.supplierId,
+              tags: e.tags,
+              preCostPrice: e.preCostPrice?.toString() ?? null,
+              sellingPrice: e.sellingPrice?.toString() ?? null,
+              machineModelIds: e.machineModels.map((m) => m.machineModelId),
+              barcodes: e.barcodes.map((b) => b.code),
+            },
+          ]),
+        ),
+        barcodesInUse: new Map(barcodes.map((b) => [b.code, b.item.partNo])),
+      },
+      mode,
+    );
+    const result = {
+      dryRun,
+      total: rows.length,
+      created: 0,
+      updated: 0,
+      errors,
+    };
+    if (errors.length) return result;
+    const counts = { created: items.length, updated: updates.length };
+    if (dryRun) return { ...result, ...counts };
+    const touched = (key: keyof ItemChanges) =>
+      updates.some((u) => u.changes[key] !== undefined);
+    if (items.length) {
+      assertWritable(itemEntity, policy, {
+        partNo: true,
+        brandId: true,
+        description: true,
+        uom: true,
+        minQty: true,
+        ...(items.some((i) => i.defaultBinId) ? { defaultBinId: true } : {}),
+        ...(items.some((i) => i.notes) ? { notes: true } : {}),
+        ...(items.some((i) => i.supplier) ? { supplierId: true } : {}),
+        ...(items.some((i) => i.tags.length) ? { tags: true } : {}),
+        ...(items.some((i) => i.preCostPrice) ? { preCostPrice: true } : {}),
+        ...(items.some((i) => i.sellingPrice) ? { sellingPrice: true } : {}),
+      });
+    }
+    assertWritable(
+      itemEntity,
+      policy,
+      Object.fromEntries(
+        (
+          [
+            ['description', 'description'],
+            ['uom', 'uom'],
+            ['minQty', 'minQty'],
+            ['defaultBinId', 'defaultBinId'],
+            ['notes', 'notes'],
+            ['supplier', 'supplierId'],
+            ['tags', 'tags'],
+            ['preCostPrice', 'preCostPrice'],
+            ['sellingPrice', 'sellingPrice'],
+          ] as const
+        )
+          .filter(([key]) => touched(key))
+          .map(([, field]) => [field, true]),
       ),
-      barcodesInUse: new Set(barcodes.map((b) => b.code)),
-    });
-    const result = { dryRun, total: rows.length, created: 0, errors };
-    if (errors.length || dryRun) return result;
-    assertWritable(itemEntity, policy, {
-      partNo: true,
-      brandId: true,
-      description: true,
-      uom: true,
-      minQty: true,
-      ...(items.some((i) => i.defaultBinId) ? { defaultBinId: true } : {}),
-      ...(items.some((i) => i.notes) ? { notes: true } : {}),
-      ...(items.some((i) => i.supplier) ? { supplierId: true } : {}),
-      ...(items.some((i) => i.tags.length) ? { tags: true } : {}),
-      ...(items.some((i) => i.preCostPrice) ? { preCostPrice: true } : {}),
-      ...(items.some((i) => i.sellingPrice) ? { sellingPrice: true } : {}),
-    });
-    await this.uniqueGuard(() => this.writeImport(policy, items), true);
-    return { ...result, created: items.length };
+    );
+    await this.uniqueGuard(
+      () => this.writeImport(policy, items, updates),
+      true,
+    );
+    return { ...result, ...counts };
   }
 
-  private writeImport(policy: Policy, items: ValidItem[]) {
+  private writeImport(
+    policy: Policy,
+    items: ValidItem[],
+    updates: ValidUpdate[],
+  ) {
     return this.prisma.$transaction(
       async (tx) => {
         for (let i = 0; i < items.length; i += 1000) {
@@ -734,18 +837,84 @@ export class ItemsService {
             await tx.itemMachineModel.createMany({ data: links });
           if (codes.length) await tx.itemBarcode.createMany({ data: codes });
         }
+        for (const update of updates) {
+          await this.writeImportUpdate(tx, policy, update);
+        }
         await this.audit.record(
           {
             moduleKey: MODULE_KEY,
             entityKey: itemEntity.key,
             action: 'imported',
-            after: { count: items.length },
+            after: { count: items.length, updated: updates.length },
           },
           tx,
         );
       },
       { timeout: 120_000, maxWait: 10_000 },
     );
+  }
+
+  private async writeImportUpdate(
+    tx: TransactionClient,
+    policy: Policy,
+    { existing, changes, machineModelIds, addBarcodes }: ValidUpdate,
+  ) {
+    const { supplier, ...fields } = changes;
+    const bumped = await tx.item.updateMany({
+      where: { id: existing.id, version: existing.version },
+      data: {
+        ...fields,
+        ...(supplier
+          ? { supplierId: supplier.id, supplierName: supplier.name }
+          : {}),
+        version: { increment: 1 },
+        updatedBy: policy.userId,
+      },
+    });
+    if (bumped.count === 0) {
+      conflict(
+        'IMPORT_CONFLICT',
+        `${existing.partNo} was changed meanwhile. Check the file again.`,
+      );
+    }
+    if (machineModelIds) {
+      await tx.itemMachineModel.deleteMany({ where: { itemId: existing.id } });
+      await tx.itemMachineModel.createMany({
+        data: machineModelIds.map((machineModelId) => ({
+          itemId: existing.id,
+          machineModelId,
+        })),
+      });
+    }
+    if (addBarcodes.length) {
+      await tx.itemBarcode.createMany({
+        data: addBarcodes.map((code) => ({
+          itemId: existing.id,
+          code,
+          kind: 'MANUFACTURER' as const,
+        })),
+      });
+    }
+    const after: Record<string, unknown> = { ...fields };
+    const before: Record<string, unknown> = Object.fromEntries(
+      Object.keys(fields)
+        .filter((k) => k !== 'allowFraction')
+        .map((k) => [k, existing[k as keyof ExistingItem]]),
+    );
+    delete after['allowFraction'];
+    if (supplier) {
+      before['supplierId'] = existing.supplierId;
+      after['supplierId'] = supplier.id;
+    }
+    if (machineModelIds) {
+      before['machineModelIds'] = [...existing.machineModelIds].sort();
+      after['machineModelIds'] = [...machineModelIds].sort();
+    }
+    if (addBarcodes.length) {
+      before['barcodes'] = existing.barcodes;
+      after['barcodes'] = [...existing.barcodes, ...addBarcodes];
+    }
+    await this.record(tx, existing.id, 'update', before, after);
   }
 
   private partNoNorm(partNo: string): string {
@@ -847,6 +1016,14 @@ export class ItemsService {
   }
 }
 
-function barcodeInUse(): never {
-  conflict('BARCODE_IN_USE', 'That barcode is already used by an item.');
+/** `null` when the barcode is already on this part; `undefined` when the other part is unknown. */
+function barcodeInUse(otherPartNo: string | null | undefined): never {
+  conflict(
+    'BARCODE_IN_USE',
+    otherPartNo === null
+      ? 'This part already has that barcode.'
+      : otherPartNo
+        ? `That barcode is already on another part: ${otherPartNo}.`
+        : 'That barcode is already on another part.',
+  );
 }
